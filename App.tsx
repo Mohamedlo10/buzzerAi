@@ -135,17 +135,24 @@ const App: React.FC = () => {
       }
     }
 
-    // Reset buzzes for everyone for this question
-    await supabase.from('buzzes').delete().eq('session_id', session.id);
-
     if (moveNext) {
+      // Bonne réponse: reset tous les buzzes et passer à la question suivante
+      await supabase.from('buzzes').delete().eq('session_id', session.id);
       const nextIndex = session.current_question_index + 1;
       const isGameOver = nextIndex >= questions.length;
-      await supabase.from('sessions').update({ 
-        current_question_index: nextIndex, 
-        status: isGameOver ? GameStatus.RESULTS : GameStatus.PLAYING 
+      await supabase.from('sessions').update({
+        current_question_index: nextIndex,
+        status: isGameOver ? GameStatus.RESULTS : GameStatus.PLAYING
       }).eq('id', session.id);
+    } else if (playerId) {
+      // Mauvaise réponse: retirer seulement ce joueur de la file d'attente
+      await supabase.from('buzzes').delete().eq('session_id', session.id).eq('player_local_id', playerId);
     }
+  };
+
+  const resetBuzzer = async () => {
+    if (!session) return;
+    await supabase.from('buzzes').delete().eq('session_id', session.id);
   };
 
   const skipQuestion = async () => {
@@ -201,7 +208,7 @@ const App: React.FC = () => {
     }
 
     if (me?.isManager) {
-      return <ManagerView state={stateObj} onValidate={validateAnswer} onSkip={skipQuestion} />;
+      return <ManagerView state={stateObj} onValidate={validateAnswer} onSkip={skipQuestion} onResetBuzzer={resetBuzzer} />;
     }
 
     return <PlayerView state={stateObj} playerId={currentPlayerId!} onBuzz={() => handleBuzz(currentPlayerId!)} />;

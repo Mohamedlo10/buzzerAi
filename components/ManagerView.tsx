@@ -1,17 +1,37 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { RoomState } from '../types';
 
 interface ManagerViewProps {
   state: RoomState;
   onValidate: (playerId: string | null, points: number, moveNext: boolean) => void;
   onSkip: () => void;
+  onResetBuzzer: () => Promise<void>;
 }
 
-const ManagerView: React.FC<ManagerViewProps> = ({ state, onValidate, onSkip }) => {
+const ManagerView: React.FC<ManagerViewProps> = ({ state, onValidate, onSkip, onResetBuzzer }) => {
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [processingAction, setProcessingAction] = useState<string | null>(null);
+
   const currentQ = state.questions[state.currentQuestionIndex];
   const activeBuzzer = state.buzzedPlayers[0];
   const playerOnTurn = activeBuzzer ? state.players.find(p => p.id === activeBuzzer.playerId) : null;
+
+  const handleValidate = async (playerId: string, points: number, moveNext: boolean) => {
+    setIsProcessing(true);
+    setProcessingAction(moveNext ? 'correct' : 'incorrect');
+    await onValidate(playerId, points, moveNext);
+    setIsProcessing(false);
+    setProcessingAction(null);
+  };
+
+  const handleResetBuzzer = async () => {
+    setIsProcessing(true);
+    setProcessingAction('reset');
+    await onResetBuzzer();
+    setIsProcessing(false);
+    setProcessingAction(null);
+  };
   
   return (
     <div className="space-y-8 animate-fade-in">
@@ -69,30 +89,67 @@ const ManagerView: React.FC<ManagerViewProps> = ({ state, onValidate, onSkip }) 
               </div>
 
               <div className="flex flex-col space-y-3">
-                <button 
-                  onClick={() => onValidate(playerOnTurn.id, 5, true)}
-                  className="w-full bg-mGreen hover:bg-mGreen/80 py-4 rounded-xl font-bold text-mTeal shadow-md transform hover:-translate-y-1 transition-all"
+                <button
+                  onClick={() => handleValidate(playerOnTurn.id, 5, true)}
+                  disabled={isProcessing}
+                  className="w-full bg-mGreen hover:bg-mGreen/80 py-4 rounded-xl font-bold text-mTeal shadow-md transform hover:-translate-y-1 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
                 >
-                  <i className="fas fa-check mr-2"></i> CORRECT (+5 pts)
+                  {processingAction === 'correct' ? (
+                    <><i className="fas fa-spinner fa-spin mr-2"></i> VALIDATION...</>
+                  ) : (
+                    <><i className="fas fa-check mr-2"></i> CORRECT (+5 pts)</>
+                  )}
                 </button>
-                <button 
-                  onClick={() => onValidate(playerOnTurn.id, -5, false)}
-                  className="w-full bg-mSienna/20 hover:bg-mSienna/40 text-mSienna py-4 rounded-xl font-bold border border-mSienna/50 transition-all"
+                <button
+                  onClick={() => handleValidate(playerOnTurn.id, -5, false)}
+                  disabled={isProcessing}
+                  className="w-full bg-mSienna/20 hover:bg-mSienna/40 text-mSienna py-4 rounded-xl font-bold border border-mSienna/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <i className="fas fa-times mr-2"></i> FAUX (-5 pts)
+                  {processingAction === 'incorrect' ? (
+                    <><i className="fas fa-spinner fa-spin mr-2"></i> PASSAGE AU SUIVANT...</>
+                  ) : (
+                    <><i className="fas fa-times mr-2"></i> FAUX (-5 pts)</>
+                  )}
                 </button>
-                <button 
-                  onClick={() => onValidate(playerOnTurn.id, 0, false)}
-                  className="w-full bg-slate-700/50 hover:bg-slate-600 text-slate-300 py-4 rounded-xl font-bold transition-all"
+                <button
+                  onClick={() => handleValidate(playerOnTurn.id, 0, false)}
+                  disabled={isProcessing}
+                  className="w-full bg-slate-700/50 hover:bg-slate-600 text-slate-300 py-4 rounded-xl font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <i className="fas fa-minus mr-2"></i> FAUX (Aucun point)
+                  {processingAction === 'incorrect' ? (
+                    <><i className="fas fa-spinner fa-spin mr-2"></i> PASSAGE AU SUIVANT...</>
+                  ) : (
+                    <><i className="fas fa-minus mr-2"></i> FAUX (Aucun point)</>
+                  )}
+                </button>
+                <button
+                  onClick={handleResetBuzzer}
+                  disabled={isProcessing}
+                  className="w-full bg-mOrange/20 hover:bg-mOrange/40 text-mOrange py-3 rounded-xl font-bold border border-mOrange/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed mt-2"
+                >
+                  {processingAction === 'reset' ? (
+                    <><i className="fas fa-spinner fa-spin mr-2"></i> RESET...</>
+                  ) : (
+                    <><i className="fas fa-redo mr-2"></i> RESET BUZZER</>
+                  )}
                 </button>
               </div>
             </div>
           ) : (
-            <div className="text-center py-20 text-mGreen/40 italic flex flex-col items-center">
+            <div className="text-center py-12 text-mGreen/40 italic flex flex-col items-center">
               <div className="mb-4 text-5xl opacity-10"><i className="fas fa-satellite-dish"></i></div>
-              Signal prêt... en attente d'un signal buzz.
+              <p className="mb-6">Signal prêt... en attente d'un signal buzz.</p>
+              <button
+                onClick={handleResetBuzzer}
+                disabled={isProcessing}
+                className="bg-mOrange/20 hover:bg-mOrange/40 text-mOrange px-6 py-3 rounded-xl font-bold border border-mOrange/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {processingAction === 'reset' ? (
+                  <><i className="fas fa-spinner fa-spin mr-2"></i> RESET...</>
+                ) : (
+                  <><i className="fas fa-redo mr-2"></i> RESET BUZZER</>
+                )}
+              </button>
             </div>
           )}
 
