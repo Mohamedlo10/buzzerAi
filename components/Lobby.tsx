@@ -23,6 +23,8 @@ const Lobby: React.FC<LobbyProps> = ({ onStart, onJoin }) => {
   const [debt, setDebt] = useState(20);
   const [qPerUser, setQPerUser] = useState(3);
   const [myLocalId, setMyLocalId] = useState(localStorage.getItem('mdev_player_id') || "user-" + Math.random().toString(36).substr(2, 9));
+  const [isJoining, setIsJoining] = useState(false);
+  const [alreadyJoined, setAlreadyJoined] = useState(false);
 
   useEffect(() => {
     if (!session?.id) return;
@@ -89,28 +91,53 @@ const Lobby: React.FC<LobbyProps> = ({ onStart, onJoin }) => {
       return alert("Veuillez ajouter au moins une rubrique (tapez le nom puis cliquez sur +)");
     }
 
-    const { data: sess, error } = await supabase.from('sessions').select('*').eq('code', inputSessionCode).single();
-    if (error || !sess) return alert("Session introuvable");
+    setIsJoining(true);
 
-    const p: Player = {
-      id: myLocalId,
-      name: newPlayerName,
-      categories: tempCategories,
-      score: 0,
-      categoryScores: {},
-      isManager: false
-    };
+    try {
+      const { data: sess, error } = await supabase.from('sessions').select('*').eq('code', inputSessionCode).single();
+      if (error || !sess) {
+        setIsJoining(false);
+        return alert("Session introuvable");
+      }
 
-    await supabase.from('players').insert({
-      local_id: myLocalId,
-      session_id: sess.id,
-      name: newPlayerName,
-      is_manager: false,
-      categories: tempCategories
-    });
+      // Vérifier si le joueur est déjà inscrit
+      const { data: existingPlayer } = await supabase
+        .from('players')
+        .select('*')
+        .eq('session_id', sess.id)
+        .eq('local_id', myLocalId)
+        .single();
 
-    setSession(sess);
-    onJoin(p, sess);
+      if (existingPlayer) {
+        setIsJoining(false);
+        setAlreadyJoined(true);
+        return alert("Vous êtes déjà inscrit à cette session");
+      }
+
+      const p: Player = {
+        id: myLocalId,
+        name: newPlayerName,
+        categories: tempCategories,
+        score: 0,
+        categoryScores: {},
+        isManager: false
+      };
+
+      await supabase.from('players').insert({
+        local_id: myLocalId,
+        session_id: sess.id,
+        name: newPlayerName,
+        is_manager: false,
+        categories: tempCategories
+      });
+
+      setSession(sess);
+      onJoin(p, sess);
+    } catch (err) {
+      console.error(err);
+      setIsJoining(false);
+      alert("Erreur lors de la connexion");
+    }
   };
 
   const addCategoryToTemp = () => {
@@ -183,7 +210,25 @@ const Lobby: React.FC<LobbyProps> = ({ onStart, onJoin }) => {
                 </div>
               </div>
 
-              <button onClick={handleJoinFinal} className="w-full bg-mOrange text-mTeal py-6 rounded-[2.5rem] font-orbitron font-black text-2xl uppercase tracking-widest">VALIDER CLOUD</button>
+              <button
+                onClick={handleJoinFinal}
+                disabled={isJoining || alreadyJoined}
+                className="w-full bg-mOrange text-mTeal py-6 rounded-[2.5rem] font-orbitron font-black text-2xl uppercase tracking-widest disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3"
+              >
+                {isJoining ? (
+                  <>
+                    <i className="fas fa-spinner fa-spin"></i>
+                    CONNEXION...
+                  </>
+                ) : alreadyJoined ? (
+                  <>
+                    <i className="fas fa-check-circle"></i>
+                    DÉJÀ INSCRIT
+                  </>
+                ) : (
+                  'VALIDER CLOUD'
+                )}
+              </button>
             </div>
             <button onClick={() => setView('CHOICE')} className="w-full text-slate-500 uppercase font-black text-[10px] tracking-widest mt-4">Retour</button>
           </div>
