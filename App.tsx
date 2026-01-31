@@ -16,13 +16,32 @@ const App: React.FC = () => {
   const [currentPlayerId, setCurrentPlayerId] = useState<string | null>(localStorage.getItem('mdev_player_id'));
   const [status, setStatus] = useState<GameStatus>(GameStatus.LOBBY);
 
+  // Fonction pour récupérer l'état des buzzes
+  const fetchBuzzState = async () => {
+    if (!session?.id) return;
+    const { data } = await supabase.from('buzzes').select('*').eq('session_id', session.id).order('created_at', { ascending: true });
+    if (data) {
+      setBuzzedPlayers(data.map(b => ({ playerId: b.player_local_id, timestamp: b.created_at })));
+    } else {
+      setBuzzedPlayers([]);
+    }
+  };
+
+  // Polling pour synchroniser l'état du buzzer toutes les secondes
+  useEffect(() => {
+    if (!session?.id || status !== GameStatus.PLAYING) return;
+
+    const pollInterval = setInterval(fetchBuzzState, 1000);
+    return () => clearInterval(pollInterval);
+  }, [session?.id, status]);
+
   // Sync Session State
   useEffect(() => {
     if (!session?.id) return;
 
     const sessionSub = supabase
       .channel('session_changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'sessions', filter: `id=eq.${session.id}` }, 
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'sessions', filter: `id=eq.${session.id}` },
         (payload) => {
           const updated = payload.new as any;
           setSession(updated);
@@ -33,7 +52,7 @@ const App: React.FC = () => {
 
     const playersSub = supabase
       .channel('players_changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'players', filter: `session_id=eq.${session.id}` }, 
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'players', filter: `session_id=eq.${session.id}` },
         async () => {
           const { data } = await supabase.from('players').select('*').eq('session_id', session.id);
           if (data) setPlayers(data.map(p => ({
@@ -50,17 +69,16 @@ const App: React.FC = () => {
 
     const buzzSub = supabase
       .channel('buzz_changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'buzzes', filter: `session_id=eq.${session.id}` }, 
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'buzzes', filter: `session_id=eq.${session.id}` },
         async () => {
-          const { data } = await supabase.from('buzzes').select('*').eq('session_id', session.id).order('created_at', { ascending: true });
-          if (data) setBuzzedPlayers(data.map(b => ({ playerId: b.player_local_id, timestamp: b.created_at })));
+          await fetchBuzzState();
         }
       )
       .subscribe();
 
     const questionsSub = supabase
       .channel('questions_changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'questions', filter: `session_id=eq.${session.id}` }, 
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'questions', filter: `session_id=eq.${session.id}` },
         async () => {
           const { data } = await supabase.from('questions').select('*').eq('session_id', session.id).order('order_index', { ascending: true });
           if (data) setQuestions(data as any);
@@ -138,6 +156,7 @@ const App: React.FC = () => {
     if (moveNext) {
       // Bonne réponse: reset tous les buzzes et passer à la question suivante
       await supabase.from('buzzes').delete().eq('session_id', session.id);
+      setBuzzedPlayers([]); // Forcer la mise à jour locale
       const nextIndex = session.current_question_index + 1;
       const isGameOver = nextIndex >= questions.length;
       await supabase.from('sessions').update({
@@ -147,22 +166,27 @@ const App: React.FC = () => {
     } else if (playerId) {
       // Mauvaise réponse: retirer seulement ce joueur de la file d'attente
       await supabase.from('buzzes').delete().eq('session_id', session.id).eq('player_local_id', playerId);
+      // Forcer la mise à jour locale - retirer ce joueur de la liste
+      setBuzzedPlayers(prev => prev.filter(b => b.playerId !== playerId));
     }
   };
 
   const resetBuzzer = async () => {
     if (!session) return;
     await supabase.from('buzzes').delete().eq('session_id', session.id);
+    // Forcer la mise à jour locale immédiatement
+    setBuzzedPlayers([]);
   };
 
   const skipQuestion = async () => {
     if (!session) return;
     await supabase.from('buzzes').delete().eq('session_id', session.id);
+    setBuzzedPlayers([]); // Forcer la mise à jour locale
     const nextIndex = session.current_question_index + 1;
     const isGameOver = nextIndex >= questions.length;
-    await supabase.from('sessions').update({ 
-      current_question_index: nextIndex, 
-      status: isGameOver ? GameStatus.RESULTS : GameStatus.PLAYING 
+    await supabase.from('sessions').update({
+      current_question_index: nextIndex,
+      status: isGameOver ? GameStatus.RESULTS : GameStatus.PLAYING
     }).eq('id', session.id);
   };
 
