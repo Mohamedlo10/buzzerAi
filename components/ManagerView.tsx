@@ -64,7 +64,8 @@ const ManagerView: React.FC<ManagerViewProps> = ({ state, onValidate, onSkip }) 
               <div className="bg-mTeal p-6 rounded-2xl border-2 border-mGreen shadow-lg animate-pulse">
                 <div className="text-[10px] text-mGreen uppercase font-black mb-1 tracking-widest">Buzz en cours par :</div>
                 <div className="text-2xl font-bold text-white uppercase">{playerOnTurn.name}</div>
-                <div className="text-sm text-mYellow font-medium">{playerOnTurn.category}</div>
+                {/* Fixed: Used currentQ.category as 'category' is not a property of Player */}
+                <div className="text-sm text-mYellow font-medium">{currentQ?.category}</div>
               </div>
 
               <div className="flex flex-col space-y-3">

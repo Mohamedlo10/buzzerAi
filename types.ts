@@ -6,11 +6,15 @@ export enum GameStatus {
   RESULTS = 'RESULTS'
 }
 
+export interface PlayerCategory {
+  name: string;
+  difficulty: 'Facile' | 'Intermédiaire' | 'Expert';
+}
+
 export interface Player {
   id: string;
   name: string;
-  category: string;
-  accessCode: string; // Code d'accès pour la rubrique
+  categories: PlayerCategory[];
   score: number;
   categoryScores: Record<string, number>;
   isManager: boolean;
@@ -23,6 +27,7 @@ export interface Question {
   answer: string;
   isUsed: boolean;
   winnerId?: string;
+  difficulty: string;
 }
 
 export interface Buzz {
