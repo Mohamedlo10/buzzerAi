@@ -79,8 +79,14 @@ const Lobby: React.FC<LobbyProps> = ({ onStart, onJoin }) => {
   };
 
   const handleJoinFinal = async () => {
-    if (!newPlayerName.trim() || !inputSessionCode.trim() || tempCategories.length === 0) {
-      return alert("Champs manquants");
+    if (!inputSessionCode.trim()) {
+      return alert("Veuillez entrer le code de session");
+    }
+    if (!newPlayerName.trim()) {
+      return alert("Veuillez entrer votre pseudo");
+    }
+    if (tempCategories.length === 0) {
+      return alert("Veuillez ajouter au moins une rubrique (tapez le nom puis cliquez sur +)");
     }
 
     const { data: sess, error } = await supabase.from('sessions').select('*').eq('code', inputSessionCode).single();
