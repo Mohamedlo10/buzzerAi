@@ -2,8 +2,7 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { PlayerCategory } from "./types";
 
-// Always use the API key directly from process.env.API_KEY using named parameter.
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
 
 export const generateQuestions = async (categories: PlayerCategory[], questionsPerCategory: number) => {
   const categoryDetails = categories.map(c => `${c.name} (Niveau: ${c.difficulty})`).join(', ');
