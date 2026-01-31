@@ -1,0 +1,5 @@
+{
+  "name": "BuzzMaster AI - Competitive Trivia",
+  "description": "A collaborative and competitive buzzer platform where players compete in custom categories. Features AI-generated questions via Gemini and a unique scoring system where players owe points if beaten in their own chosen category.",
+  "requestFramePermissions": []
+}
