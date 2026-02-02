@@ -136,7 +136,7 @@ const App: React.FC = () => {
       });
     });
 
-    if (allCategories.length === 0) allCategories.push({ name: "Culture Generale", difficulty: "Intermediaire" });
+    if (allCategories.length === 0) allCategories.push({ name: "Culture Generale", difficulty: "Intermédiaire" });
 
     const rawQuestions = await generateQuestions(allCategories, questionsPerCategory);
 
@@ -347,6 +347,19 @@ const App: React.FC = () => {
   };
 
   const renderContent = () => {
+    // Home page for logged in users
+    if (appView === AppView.HOME && user) {
+      return (
+        <HomePage
+          user={user}
+          onLogout={handleLogout}
+          onCreateSession={() => setAppView(AppView.LOBBY)}
+          onJoinSession={() => setAppView(AppView.LOBBY)}
+          onRejoinSession={handleRejoinSession}
+        />
+      );
+    }
+
     // Lobby
     if (appView === AppView.LOBBY || status === GameStatus.LOBBY) {
       return (
@@ -518,6 +531,15 @@ const App: React.FC = () => {
             />
           </div>
         </div>
+      )}
+
+      {/* Panel historique des parties */}
+      {showHistoryPanel && user && (
+        <GameHistoryPanel
+          user={user}
+          onRejoinSession={handleRejoinSession}
+          onClose={() => setShowHistoryPanel(false)}
+        />
       )}
 
       <footer className="mt-16 sm:mt-20 py-4 sm:py-6 border-t border-mGreen/20 text-center text-[7px] sm:text-[8px] text-slate-600 font-bold uppercase tracking-[0.3em] sm:tracking-[0.5em] px-2">

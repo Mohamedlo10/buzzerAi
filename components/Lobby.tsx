@@ -24,7 +24,7 @@ const Lobby: React.FC<LobbyProps> = ({ onStart, onJoin, user, onBack }) => {
   const isUsernameFixed = !!user;
   const [tempCategories, setTempCategories] = useState<PlayerCategory[]>([]);
   const [catInput, setCatInput] = useState('');
-  const [difficultyInput, setDifficultyInput] = useState<PlayerCategory['difficulty']>('Intermediaire');
+  const [difficultyInput, setDifficultyInput] = useState<PlayerCategory['difficulty']>('Intermédiaire');
 
   const [debt, setDebt] = useState(20);
   const [qPerUser, setQPerUser] = useState(3);
@@ -509,7 +509,7 @@ const Lobby: React.FC<LobbyProps> = ({ onStart, onJoin, user, onBack }) => {
                     onChange={e => setDifficultyInput(e.target.value as PlayerCategory['difficulty'])}
                   >
                     <option value="Facile">Facile</option>
-                    <option value="Intermediaire">Intermediaire</option>
+                    <option value="Intermédiaire">Intermédiaire</option>
                     <option value="Expert">Expert</option>
                   </select>
                 </div>
