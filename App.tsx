@@ -2,8 +2,12 @@
 import React, { useState, useEffect } from 'react';
 import { GameStatus, AppView, RoomState, Player, Question, PlayerCategory, User, Buzz } from './types';
 import { generateQuestions } from './geminiService';
-import { supabase } from './supabaseClient';
 import { authService } from './services/authService';
+import { sessionService } from './services/sessionService';
+import { playerService } from './services/playerService';
+import { questionService } from './services/questionService';
+import { buzzService } from './services/buzzService';
+import { realtimeService } from './services/realtimeService';
 import Lobby from './components/Lobby';
 import ManagerView from './components/ManagerView';
 import PlayerView from './components/PlayerView';
@@ -32,27 +36,9 @@ const App: React.FC = () => {
   const fetchBuzzState = async (sessionId?: string) => {
     const sid = sessionId || session?.id;
     if (!sid) return;
-    const { data } = await supabase
-      .from('buzzes')
-      .select('*')
-      .eq('session_id', sid)
-      .order('buzz_timestamp_ms', { ascending: true, nullsFirst: false });
 
-    if (data && data.length > 0) {
-      const firstBuzzMs = data[0].buzz_timestamp_ms || new Date(data[0].created_at).getTime();
-      const buzzesWithTiming: Buzz[] = data.map((b, index) => {
-        const buzzMs = b.buzz_timestamp_ms || new Date(b.created_at).getTime();
-        return {
-          playerId: b.player_local_id,
-          timestamp: new Date(b.created_at).getTime(),
-          timestampMs: buzzMs,
-          timeDiffMs: index === 0 ? 0 : buzzMs - firstBuzzMs
-        };
-      });
-      setBuzzedPlayers(buzzesWithTiming);
-    } else {
-      setBuzzedPlayers([]);
-    }
+    const buzzes = await buzzService.getBuzzesBySession(sid);
+    setBuzzedPlayers(buzzes);
   };
 
   // Polling pour synchroniser l'etat du buzzer toutes les secondes
@@ -67,65 +53,38 @@ const App: React.FC = () => {
   useEffect(() => {
     if (!session?.id) return;
 
-    const sessionSub = supabase
-      .channel('session_changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'sessions', filter: `id=eq.${session.id}` },
-        (payload) => {
-          const updated = payload.new as any;
-          setSession(updated);
-          setStatus(updated.status as GameStatus);
-        }
-      )
-      .subscribe();
+    const sessionSub = realtimeService.subscribeToSession(session.id, (payload) => {
+      const updated = payload.new as any;
+      setSession(updated);
+      setStatus(updated.status as GameStatus);
+    });
 
-    const playersSub = supabase
-      .channel('players_changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'players', filter: `session_id=eq.${session.id}` },
-        async () => {
-          const { data } = await supabase.from('players').select('*').eq('session_id', session.id);
-          if (data) setPlayers(data.map(p => ({
-            id: p.local_id,
-            name: p.name,
-            categories: p.categories,
-            score: p.score,
-            categoryScores: p.category_scores,
-            isManager: p.is_manager
-          })));
-        }
-      )
-      .subscribe();
+    const playersSub = realtimeService.subscribeToPlayers(session.id, async () => {
+      const playersData = await playerService.getPlayersBySession(session.id);
+      setPlayers(playersData);
+    });
 
-    const buzzSub = supabase
-      .channel('buzz_changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'buzzes', filter: `session_id=eq.${session.id}` },
-        async () => {
-          await fetchBuzzState();
-        }
-      )
-      .subscribe();
+    const buzzSub = realtimeService.subscribeToBuzzes(session.id, async () => {
+      await fetchBuzzState();
+    });
 
-    const questionsSub = supabase
-      .channel('questions_changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'questions', filter: `session_id=eq.${session.id}` },
-        async () => {
-          const { data } = await supabase.from('questions').select('*').eq('session_id', session.id).order('order_index', { ascending: true });
-          if (data) setQuestions(data as any);
-        }
-      )
-      .subscribe();
+    const questionsSub = realtimeService.subscribeToQuestions(session.id, async () => {
+      const questionsData = await questionService.getQuestionsBySession(session.id);
+      setQuestions(questionsData);
+    });
 
     return () => {
-      supabase.removeChannel(sessionSub);
-      supabase.removeChannel(playersSub);
-      supabase.removeChannel(buzzSub);
-      supabase.removeChannel(questionsSub);
+      realtimeService.unsubscribe(sessionSub);
+      realtimeService.unsubscribe(playersSub);
+      realtimeService.unsubscribe(buzzSub);
+      realtimeService.unsubscribe(questionsSub);
     };
   }, [session?.id]);
 
   const setupGame = async (allPlayers: Player[], debt: number, questionsPerCategory: number) => {
     if (!session) return;
 
-    await supabase.from('sessions').update({ status: GameStatus.GENERATING, debt_amount: debt, q_per_user: questionsPerCategory }).eq('id', session.id);
+    await sessionService.startGenerating(session.id, debt, questionsPerCategory);
 
     const allCategories: PlayerCategory[] = [];
     allPlayers.forEach(p => {
@@ -140,17 +99,8 @@ const App: React.FC = () => {
 
     const rawQuestions = await generateQuestions(allCategories, questionsPerCategory);
 
-    const dbQuestions = rawQuestions.map((q: any, index: number) => ({
-      session_id: session.id,
-      category: q.category,
-      text: q.text,
-      answer: q.answer,
-      difficulty: q.difficulty,
-      order_index: index
-    }));
-
-    await supabase.from('questions').insert(dbQuestions);
-    await supabase.from('sessions').update({ status: GameStatus.PLAYING, current_question_index: 0 }).eq('id', session.id);
+    await questionService.createQuestions(session.id, rawQuestions);
+    await sessionService.startPlaying(session.id);
   };
 
   const handleBuzz = async (playerId: string) => {
@@ -158,38 +108,28 @@ const App: React.FC = () => {
 
     const buzzTimestampMs = Date.now();
 
-    try {
-      const { error } = await supabase.from('buzzes').insert({
-        session_id: session.id,
-        player_local_id: playerId,
-        buzz_timestamp_ms: buzzTimestampMs
-      });
+    const result = await buzzService.createBuzz(session.id, playerId);
 
-      // Erreur 23505 = violation de contrainte unique = deja buzze
-      if (error?.code === '23505') {
-        console.log('Player already buzzed');
-        return;
-      }
-
-      if (error) {
-        console.error('Buzz error:', error);
-        return;
-      }
-
-      // Mise a jour optimiste locale
-      setBuzzedPlayers(prev => {
-        if (prev.some(b => b.playerId === playerId)) return prev;
-        const firstMs = prev.length > 0 ? (prev[0].timestampMs || prev[0].timestamp) : buzzTimestampMs;
-        return [...prev, {
-          playerId,
-          timestamp: buzzTimestampMs,
-          timestampMs: buzzTimestampMs,
-          timeDiffMs: prev.length === 0 ? 0 : buzzTimestampMs - firstMs
-        }];
-      });
-    } catch (err) {
-      console.error('Buzz exception:', err);
+    if (result.alreadyBuzzed) {
+      console.log('Player already buzzed');
+      return;
     }
+
+    if (!result.success) {
+      return;
+    }
+
+    // Mise a jour optimiste locale
+    setBuzzedPlayers(prev => {
+      if (prev.some(b => b.playerId === playerId)) return prev;
+      const firstMs = prev.length > 0 ? (prev[0].timestampMs || prev[0].timestamp) : buzzTimestampMs;
+      return [...prev, {
+        playerId,
+        timestamp: buzzTimestampMs,
+        timestampMs: buzzTimestampMs,
+        timeDiffMs: prev.length === 0 ? 0 : buzzTimestampMs - firstMs
+      }];
+    });
   };
 
   const validateAnswer = async (playerId: string | null, points: number, moveNext: boolean) => {
@@ -204,23 +144,20 @@ const App: React.FC = () => {
         if (points > 0) {
           newCatScores[currentQ.category] = (newCatScores[currentQ.category] || 0) + 1;
         }
-        await supabase.from('players').update({ score: newScore, category_scores: newCatScores }).eq('session_id', session.id).eq('local_id', playerId);
+        await playerService.updatePlayerScore(session.id, playerId, newScore, newCatScores);
       }
     }
 
     if (moveNext) {
       // Bonne reponse: reset tous les buzzes et passer a la question suivante
-      await supabase.from('buzzes').delete().eq('session_id', session.id);
+      await buzzService.deleteAllBuzzes(session.id);
       setBuzzedPlayers([]);
       const nextIndex = session.current_question_index + 1;
       const isGameOver = nextIndex >= questions.length;
-      await supabase.from('sessions').update({
-        current_question_index: nextIndex,
-        status: isGameOver ? GameStatus.RESULTS : GameStatus.PLAYING
-      }).eq('id', session.id);
+      await sessionService.advanceToNextQuestion(session.id, nextIndex, isGameOver);
     } else if (playerId) {
       // Mauvaise reponse: retirer seulement ce joueur - passage AUTOMATIQUE au suivant
-      await supabase.from('buzzes').delete().eq('session_id', session.id).eq('player_local_id', playerId);
+      await buzzService.deletePlayerBuzz(session.id, playerId);
       setBuzzedPlayers(prev => {
         const filtered = prev.filter(b => b.playerId !== playerId);
         // Recalculer les timeDiffMs avec le nouveau premier
@@ -238,29 +175,22 @@ const App: React.FC = () => {
 
   const resetBuzzer = async () => {
     if (!session) return;
-    await supabase.from('buzzes').delete().eq('session_id', session.id);
+    await buzzService.deleteAllBuzzes(session.id);
     setBuzzedPlayers([]);
   };
 
   const skipQuestion = async () => {
     if (!session) return;
-    await supabase.from('buzzes').delete().eq('session_id', session.id);
+    await buzzService.deleteAllBuzzes(session.id);
     setBuzzedPlayers([]);
     const nextIndex = session.current_question_index + 1;
     const isGameOver = nextIndex >= questions.length;
-    await supabase.from('sessions').update({
-      current_question_index: nextIndex,
-      status: isGameOver ? GameStatus.RESULTS : GameStatus.PLAYING
-    }).eq('id', session.id);
+    await sessionService.advanceToNextQuestion(session.id, nextIndex, isGameOver);
   };
 
   // Handler pour rejoindre une session depuis HomePage
   const handleRejoinSession = async (sessionId: string, sessionCode: string) => {
-    const { data: sess } = await supabase
-      .from('sessions')
-      .select('*')
-      .eq('id', sessionId)
-      .maybeSingle();
+    const sess = await sessionService.getSessionById(sessionId);
 
     if (!sess) {
       alert('Session introuvable');
@@ -271,26 +201,14 @@ const App: React.FC = () => {
     let existingPlayer = null;
 
     if (user) {
-      const { data } = await supabase
-        .from('players')
-        .select('*')
-        .eq('session_id', sessionId)
-        .eq('name', user.username)
-        .maybeSingle();
-      existingPlayer = data;
+      existingPlayer = await playerService.getPlayerByUsername(sessionId, user.username);
     }
 
     // Sinon chercher par local_id
     if (!existingPlayer) {
       const storedPlayerId = localStorage.getItem('mdev_player_id');
       if (storedPlayerId) {
-        const { data } = await supabase
-          .from('players')
-          .select('*')
-          .eq('session_id', sessionId)
-          .eq('local_id', storedPlayerId)
-          .maybeSingle();
-        existingPlayer = data;
+        existingPlayer = await playerService.getPlayerByLocalId(sessionId, storedPlayerId);
       }
     }
 
@@ -301,20 +219,11 @@ const App: React.FC = () => {
       setStatus(sess.status as GameStatus);
 
       // Charger les joueurs et questions
-      const { data: playersData } = await supabase.from('players').select('*').eq('session_id', sessionId);
-      if (playersData) {
-        setPlayers(playersData.map(p => ({
-          id: p.local_id,
-          name: p.name,
-          categories: p.categories,
-          score: p.score,
-          categoryScores: p.category_scores,
-          isManager: p.is_manager
-        })));
-      }
+      const playersData = await playerService.getPlayersBySession(sessionId);
+      setPlayers(playersData);
 
-      const { data: questionsData } = await supabase.from('questions').select('*').eq('session_id', sessionId).order('order_index', { ascending: true });
-      if (questionsData) setQuestions(questionsData as any);
+      const questionsData = await questionService.getQuestionsBySession(sessionId);
+      setQuestions(questionsData);
 
       await fetchBuzzState(sessionId);
       setAppView(AppView.GAME);
@@ -392,20 +301,11 @@ const App: React.FC = () => {
 
             // Si la session est deja en cours, charger les donnees
             if (sess.status === GameStatus.PLAYING || sess.status === GameStatus.GENERATING) {
-              const { data: playersData } = await supabase.from('players').select('*').eq('session_id', sess.id);
-              if (playersData) {
-                setPlayers(playersData.map((pl: any) => ({
-                  id: pl.local_id,
-                  name: pl.name,
-                  categories: pl.categories,
-                  score: pl.score,
-                  categoryScores: pl.category_scores,
-                  isManager: pl.is_manager
-                })));
-              }
+              const playersData = await playerService.getPlayersBySession(sess.id);
+              setPlayers(playersData);
 
-              const { data: questionsData } = await supabase.from('questions').select('*').eq('session_id', sess.id).order('order_index', { ascending: true });
-              if (questionsData) setQuestions(questionsData as any);
+              const questionsData = await questionService.getQuestionsBySession(sess.id);
+              setQuestions(questionsData);
 
               await fetchBuzzState(sess.id);
             }

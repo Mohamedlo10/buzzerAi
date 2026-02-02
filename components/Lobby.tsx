@@ -1,7 +1,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { Player, PlayerCategory, User } from '../types';
-import { supabase } from '../supabaseClient';
+import { sessionService } from '../services/sessionService';
+import { playerService } from '../services/playerService';
+import { realtimeService } from '../services/realtimeService';
 
 interface LobbyProps {
   onStart: (players: Player[], debt: number, qPerUser: number) => void;
@@ -28,7 +30,7 @@ const Lobby: React.FC<LobbyProps> = ({ onStart, onJoin, user, onBack }) => {
 
   const [debt, setDebt] = useState(20);
   const [qPerUser, setQPerUser] = useState(3);
-  const [myLocalId, setMyLocalId] = useState(localStorage.getItem('mdev_player_id') || "user-" + Math.random().toString(36).substr(2, 9));
+  const [myLocalId, setMyLocalId] = useState(localStorage.getItem('mdev_player_id') || playerService.generateLocalId());
   const [isJoining, setIsJoining] = useState(false);
 
   useEffect(() => {
@@ -49,67 +51,37 @@ const Lobby: React.FC<LobbyProps> = ({ onStart, onJoin, user, onBack }) => {
 
     // Charger les joueurs initiaux
     const loadPlayers = async () => {
-      const { data } = await supabase.from('players').select('*').eq('session_id', session.id);
-      if (data) setPlayers(data.map(p => ({
-        id: p.local_id,
-        name: p.name,
-        categories: p.categories,
-        score: p.score,
-        categoryScores: p.category_scores,
-        isManager: p.is_manager
-      })));
+      const playersData = await playerService.getPlayersBySession(session.id);
+      setPlayers(playersData);
     };
     loadPlayers();
 
-    const playersSub = supabase
-      .channel('lobby_players')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'players', filter: `session_id=eq.${session.id}` },
-        async () => {
-          const { data } = await supabase.from('players').select('*').eq('session_id', session.id);
-          if (data) setPlayers(data.map(p => ({
-            id: p.local_id,
-            name: p.name,
-            categories: p.categories,
-            score: p.score,
-            categoryScores: p.category_scores,
-            isManager: p.is_manager
-          })));
-        }
-      )
-      .subscribe();
+    const playersSub = realtimeService.subscribeToLobbyPlayers(session.id, async () => {
+      const playersData = await playerService.getPlayersBySession(session.id);
+      setPlayers(playersData);
+    });
 
     // Subscription aux changements de session (pour detecter le lancement du jeu)
-    const sessionSub = supabase
-      .channel('lobby_session')
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'sessions', filter: `id=eq.${session.id}` },
-        (payload) => {
-          const updated = payload.new as any;
-          if (updated.status !== 'LOBBY' && currentPlayer) {
-            // Le jeu a ete lance, rediriger vers le jeu
-            onJoin(currentPlayer, updated);
-          }
-        }
-      )
-      .subscribe();
+    const sessionSub = realtimeService.subscribeToLobbySession(session.id, (payload) => {
+      const updated = payload.new as any;
+      if (updated.status !== 'LOBBY' && currentPlayer) {
+        // Le jeu a ete lance, rediriger vers le jeu
+        onJoin(currentPlayer, updated);
+      }
+    });
 
     return () => {
-      supabase.removeChannel(playersSub);
-      supabase.removeChannel(sessionSub);
+      realtimeService.unsubscribe(playersSub);
+      realtimeService.unsubscribe(sessionSub);
     };
   }, [session?.id, currentPlayer]);
 
   const handleCreateRoom = async () => {
     if (!managerName.trim()) return alert("Nom requis");
-    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    const code = sessionService.generateSessionCode();
 
-    const { data: sess, error: sErr } = await supabase.from('sessions').insert({
-      code,
-      manager_id: myLocalId,
-      status: 'LOBBY',
-      user_id: user?.id || null
-    }).select().single();
-
-    if (sErr || !sess) return alert("Erreur creation session Supabase");
+    const sess = await sessionService.createSession(code, myLocalId, user?.id);
+    if (!sess) return alert("Erreur creation session Supabase");
 
     const p: Player = {
       id: myLocalId,
@@ -120,14 +92,7 @@ const Lobby: React.FC<LobbyProps> = ({ onStart, onJoin, user, onBack }) => {
       isManager: true
     };
 
-    await supabase.from('players').insert({
-      local_id: myLocalId,
-      session_id: sess.id,
-      name: managerName,
-      is_manager: true,
-      categories: [],
-      user_id: user?.id || null
-    });
+    await playerService.createPlayer(sess.id, myLocalId, managerName, true, [], user?.id);
 
     setSession(sess);
     setCurrentPlayer(p);
@@ -145,8 +110,8 @@ const Lobby: React.FC<LobbyProps> = ({ onStart, onJoin, user, onBack }) => {
     setIsJoining(true);
 
     try {
-      const { data: sess, error } = await supabase.from('sessions').select('*').eq('code', inputSessionCode).single();
-      if (error || !sess) {
+      const sess = await sessionService.getSessionByCode(inputSessionCode);
+      if (!sess) {
         setIsJoining(false);
         return alert("Session introuvable");
       }
@@ -154,18 +119,10 @@ const Lobby: React.FC<LobbyProps> = ({ onStart, onJoin, user, onBack }) => {
       // Si la session n'est pas en LOBBY, rediriger directement vers le jeu
       if (sess.status !== 'LOBBY') {
         // Verifier si le joueur existe deja
-        const { data: existingByName } = await supabase
-          .from('players')
-          .select('*')
-          .eq('session_id', sess.id)
-          .eq('name', newPlayerName.trim())
-          .single();
+        const existingByName = await playerService.getPlayerByName(sess.id, newPlayerName.trim());
 
         if (existingByName) {
-          await supabase
-            .from('players')
-            .update({ local_id: myLocalId, user_id: user?.id || null })
-            .eq('id', existingByName.id);
+          await playerService.updatePlayerLocalId(existingByName.id, myLocalId, user?.id);
 
           const p: Player = {
             id: myLocalId,
@@ -186,12 +143,7 @@ const Lobby: React.FC<LobbyProps> = ({ onStart, onJoin, user, onBack }) => {
       }
 
       // 1. Verifier si le joueur existe deja par local_id
-      const { data: existingByLocalId } = await supabase
-        .from('players')
-        .select('*')
-        .eq('session_id', sess.id)
-        .eq('local_id', myLocalId)
-        .single();
+      const existingByLocalId = await playerService.getPlayerByLocalId(sess.id, myLocalId);
 
       if (existingByLocalId) {
         const p: Player = {
@@ -218,18 +170,10 @@ const Lobby: React.FC<LobbyProps> = ({ onStart, onJoin, user, onBack }) => {
       }
 
       // 2. Verifier si un joueur avec le meme username existe
-      const { data: existingByName } = await supabase
-        .from('players')
-        .select('*')
-        .eq('session_id', sess.id)
-        .eq('name', newPlayerName.trim())
-        .single();
+      const existingByName = await playerService.getPlayerByName(sess.id, newPlayerName.trim());
 
       if (existingByName) {
-        await supabase
-          .from('players')
-          .update({ local_id: myLocalId, user_id: user?.id || null })
-          .eq('id', existingByName.id);
+        await playerService.updatePlayerLocalId(existingByName.id, myLocalId, user?.id);
 
         const p: Player = {
           id: myLocalId,
@@ -266,14 +210,7 @@ const Lobby: React.FC<LobbyProps> = ({ onStart, onJoin, user, onBack }) => {
         isManager: false
       };
 
-      await supabase.from('players').insert({
-        local_id: myLocalId,
-        session_id: sess.id,
-        name: newPlayerName,
-        is_manager: false,
-        categories: tempCategories,
-        user_id: user?.id || null
-      });
+      await playerService.createPlayer(sess.id, myLocalId, newPlayerName, false, tempCategories, user?.id);
 
       setSession(sess);
       setCurrentPlayer(p);
