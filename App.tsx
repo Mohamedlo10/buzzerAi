@@ -10,6 +10,7 @@ import PlayerView from './components/PlayerView';
 import Results from './components/Results';
 import AuthPage from './components/AuthPage';
 import HomePage from './components/HomePage';
+import GameHistoryPanel from './components/GameHistoryPanel';
 
 const App: React.FC = () => {
   // Auth state
@@ -17,6 +18,7 @@ const App: React.FC = () => {
   const [appView, setAppView] = useState<AppView>(AppView.LOBBY);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
+  const [showHistoryPanel, setShowHistoryPanel] = useState(false);
 
   // Game state
   const [session, setSession] = useState<any>(null);
@@ -455,6 +457,14 @@ const App: React.FC = () => {
           {/* User connecte */}
           {user && (
             <div className="flex items-center gap-3">
+              <button
+                onClick={() => setShowHistoryPanel(true)}
+                className="glass px-3 py-1.5 rounded-full text-xs font-bold text-mGreen border border-mGreen/30 hover:bg-mGreen/10 transition-all"
+                title="Mes parties"
+              >
+                <i className="fas fa-history mr-1"></i>
+                Mes parties
+              </button>
               <div className="glass px-3 py-1.5 rounded-full flex items-center space-x-2 border-mYellow/30 bg-mYellow/5">
                 <i className="fas fa-user text-mYellow text-xs"></i>
                 <span className="text-[10px] font-bold text-mYellow uppercase tracking-wider">{user.username}</span>

@@ -13,6 +13,21 @@ export interface ActiveSession {
   status: string;
   created_at: string;
   player_count: number;
+  my_score?: number;
+  is_manager?: boolean;
+}
+
+export interface GameHistory {
+  id: string;
+  code: string;
+  status: string;
+  created_at: string;
+  player_count: number;
+  my_score: number;
+  my_rank: number;
+  is_manager: boolean;
+  winner_name?: string;
+  winner_score?: number;
 }
 
 const USER_STORAGE_KEY = 'mdev_user';
@@ -193,5 +208,105 @@ export const authService = {
       .single();
 
     return !data;
+  },
+
+  async getUserGameHistory(userId: string): Promise<GameHistory[]> {
+    // Recuperer toutes les sessions ou l'utilisateur a joue (terminees)
+    const { data: playerData, error } = await supabase
+      .from('players')
+      .select(`
+        score,
+        is_manager,
+        session_id,
+        sessions (
+          id,
+          code,
+          status,
+          created_at
+        )
+      `)
+      .eq('user_id', userId);
+
+    if (error || !playerData) {
+      console.error('Error fetching game history:', error);
+      return [];
+    }
+
+    const history: GameHistory[] = [];
+
+    for (const p of playerData) {
+      const sess = p.sessions as any;
+      if (!sess || sess.status !== 'RESULTS') continue;
+
+      // Recuperer tous les joueurs de cette session pour le classement
+      const { data: allPlayers } = await supabase
+        .from('players')
+        .select('name, score')
+        .eq('session_id', sess.id)
+        .order('score', { ascending: false });
+
+      const playerCount = allPlayers?.length || 0;
+      const myRank = allPlayers?.findIndex(pl => pl.score <= p.score) ?? 0;
+      const winner = allPlayers?.[0];
+
+      history.push({
+        id: sess.id,
+        code: sess.code,
+        status: sess.status,
+        created_at: sess.created_at,
+        player_count: playerCount,
+        my_score: p.score,
+        my_rank: myRank + 1,
+        is_manager: p.is_manager,
+        winner_name: winner?.name,
+        winner_score: winner?.score
+      });
+    }
+
+    // Trier par date decroissante
+    return history.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  },
+
+  async getSessionsByUsername(username: string): Promise<ActiveSession[]> {
+    // Trouver toutes les sessions ou ce username est joueur
+    const { data, error } = await supabase
+      .from('players')
+      .select(`
+        local_id,
+        score,
+        is_manager,
+        sessions (
+          id,
+          code,
+          status,
+          created_at
+        )
+      `)
+      .eq('name', username.trim());
+
+    if (error || !data) return [];
+
+    const sessions: ActiveSession[] = [];
+    for (const p of data) {
+      const sess = p.sessions as any;
+      if (!sess) continue;
+
+      const { count } = await supabase
+        .from('players')
+        .select('*', { count: 'exact', head: true })
+        .eq('session_id', sess.id);
+
+      sessions.push({
+        id: sess.id,
+        code: sess.code,
+        status: sess.status,
+        created_at: sess.created_at,
+        player_count: count || 0,
+        my_score: p.score,
+        is_manager: p.is_manager
+      });
+    }
+
+    return sessions;
   }
 };

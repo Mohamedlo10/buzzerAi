@@ -14,11 +14,14 @@ const Lobby: React.FC<LobbyProps> = ({ onStart, onJoin, user, onBack }) => {
   const [view, setView] = useState<'CHOICE' | 'CREATE' | 'JOIN' | 'WAITING'>('CHOICE');
   const [session, setSession] = useState<any>(null);
   const [players, setPlayers] = useState<Player[]>([]);
+  // Si connecte, utiliser automatiquement le username du compte
   const [managerName, setManagerName] = useState(user?.username || '');
   const [currentPlayer, setCurrentPlayer] = useState<Player | null>(null);
 
   const [inputSessionCode, setInputSessionCode] = useState('');
+  // Si connecte, le username est fixe
   const [newPlayerName, setNewPlayerName] = useState(user?.username || '');
+  const isUsernameFixed = !!user;
   const [tempCategories, setTempCategories] = useState<PlayerCategory[]>([]);
   const [catInput, setCatInput] = useState('');
   const [difficultyInput, setDifficultyInput] = useState<PlayerCategory['difficulty']>('Intermediaire');
@@ -192,9 +195,17 @@ const Lobby: React.FC<LobbyProps> = ({ onStart, onJoin, user, onBack }) => {
           isManager: existingByLocalId.is_manager
         };
         setIsJoining(false);
-        setSession(sess);
-        setCurrentPlayer(p);
-        setView('WAITING');
+
+        // Si c'est l'admin, rediriger directement vers la vue admin
+        if (existingByLocalId.is_manager) {
+          setSession(sess);
+          setCurrentPlayer(p);
+          onJoin(p, sess);
+        } else {
+          setSession(sess);
+          setCurrentPlayer(p);
+          setView('WAITING');
+        }
         return;
       }
 
@@ -223,9 +234,17 @@ const Lobby: React.FC<LobbyProps> = ({ onStart, onJoin, user, onBack }) => {
 
         localStorage.setItem('mdev_player_id', myLocalId);
         setIsJoining(false);
-        setSession(sess);
-        setCurrentPlayer(p);
-        setView('WAITING');
+
+        // Si c'est l'admin, rediriger directement vers la vue admin
+        if (existingByName.is_manager) {
+          setSession(sess);
+          setCurrentPlayer(p);
+          onJoin(p, sess);
+        } else {
+          setSession(sess);
+          setCurrentPlayer(p);
+          setView('WAITING');
+        }
         return;
       }
 
@@ -386,13 +405,15 @@ const Lobby: React.FC<LobbyProps> = ({ onStart, onJoin, user, onBack }) => {
                 <div>
                   <label className="block text-xs text-mGreen uppercase font-bold tracking-widest mb-2 ml-2">
                     Pseudo du gerant
+                    {isUsernameFixed && <span className="text-mYellow ml-2">(compte connecte)</span>}
                   </label>
                   <input
                     type="text"
                     placeholder="Ex: QuizMaster"
-                    className="w-full bg-mTeal/50 border border-mGreen/20 rounded-2xl px-6 py-4 outline-none focus:ring-2 focus:ring-mYellow text-lg"
+                    className={`w-full bg-mTeal/50 border border-mGreen/20 rounded-2xl px-6 py-4 outline-none focus:ring-2 focus:ring-mYellow text-lg ${isUsernameFixed ? 'opacity-70 cursor-not-allowed' : ''}`}
                     value={managerName}
-                    onChange={e => setManagerName(e.target.value)}
+                    onChange={e => !isUsernameFixed && setManagerName(e.target.value)}
+                    disabled={isUsernameFixed}
                   />
                 </div>
                 <button onClick={handleCreateRoom} className="w-full bg-mYellow text-mTeal py-5 rounded-2xl font-orbitron font-black text-xl uppercase shadow-xl hover:bg-mYellow/90 transition-all">
@@ -450,18 +471,28 @@ const Lobby: React.FC<LobbyProps> = ({ onStart, onJoin, user, onBack }) => {
               <div>
                 <label className="block text-xs text-mGreen uppercase font-bold tracking-widest mb-2 ml-2">
                   Votre pseudo
+                  {isUsernameFixed && <span className="text-mYellow ml-2">(compte connecte)</span>}
                 </label>
                 <input
                   type="text"
                   placeholder="Ex: Player1"
-                  className="w-full bg-[#1e3b46] border border-mGreen/20 rounded-2xl px-6 py-4 outline-none focus:ring-2 focus:ring-mOrange text-lg"
+                  className={`w-full bg-[#1e3b46] border border-mGreen/20 rounded-2xl px-6 py-4 outline-none focus:ring-2 focus:ring-mOrange text-lg ${isUsernameFixed ? 'opacity-70 cursor-not-allowed' : ''}`}
                   value={newPlayerName}
-                  onChange={e => setNewPlayerName(e.target.value)}
+                  onChange={e => !isUsernameFixed && setNewPlayerName(e.target.value)}
+                  disabled={isUsernameFixed}
                 />
-                <p className="text-[10px] text-slate-500 mt-1 ml-2">
-                  <i className="fas fa-info-circle mr-1"></i>
-                  Si vous avez deja rejoint, utilisez le meme pseudo pour recuperer votre session
-                </p>
+                {!isUsernameFixed && (
+                  <p className="text-[10px] text-slate-500 mt-1 ml-2">
+                    <i className="fas fa-info-circle mr-1"></i>
+                    Si vous avez deja rejoint, utilisez le meme pseudo pour recuperer votre session
+                  </p>
+                )}
+                {isUsernameFixed && (
+                  <p className="text-[10px] text-mGreen mt-1 ml-2">
+                    <i className="fas fa-check-circle mr-1"></i>
+                    Votre pseudo de compte sera utilise automatiquement
+                  </p>
+                )}
               </div>
 
               <div className="p-5 bg-mTeal/20 border border-mOrange/30 rounded-2xl space-y-4">
