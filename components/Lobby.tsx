@@ -293,19 +293,19 @@ const Lobby: React.FC<LobbyProps> = ({ onStart, onJoin, user, onBack }) => {
     return (
       <div className="flex flex-col items-center justify-center space-y-12 animate-fade-in py-12">
         <div className="text-center">
-          <h2 className="text-4xl md:text-5xl font-orbitron text-mYellow font-bold mb-4">MDEV CLOUD BUZZ</h2>
-          <p className="text-mGreen font-orbitron text-xs tracking-[0.4em] uppercase opacity-80">Sync via Supabase Realtime</p>
+          <h2 className="text-xl sm:text-2xl md:text-4xl lg:text-5xl font-orbitron text-mYellow font-bold mb-4 text-center">MDEV CLOUD BUZZ</h2>
+          <p className="text-mGreen font-orbitron text-xs tracking-[0.2em] sm:tracking-[0.4em] uppercase opacity-80 text-center">Sync via Supabase Realtime</p>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 w-full max-w-4xl">
-          <button onClick={() => setView('CREATE')} className="glass p-12 rounded-[3rem] border-mGreen/30 hover:border-mGreen transition-all group flex flex-col items-center space-y-6 shadow-2xl">
-            <div className="bg-mGreen/20 p-6 rounded-full group-hover:scale-110 transition-transform"><i className="fas fa-server text-5xl text-mGreen"></i></div>
-            <span className="font-orbitron font-black text-xl text-mGreen block uppercase tracking-widest">ADMIN SALLE</span>
-            <span className="text-xs text-slate-500">Creer et gerer une partie</span>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8 w-full max-w-4xl">
+          <button onClick={() => setView('CREATE')} className="glass p-8 sm:p-12 rounded-[2rem] sm:rounded-[3rem] border-mGreen/30 hover:border-mGreen transition-all group flex flex-col items-center space-y-4 sm:space-y-6 shadow-2xl">
+            <div className="bg-mGreen/20 p-4 sm:p-6 rounded-full group-hover:scale-110 transition-transform"><i className="fas fa-server text-3xl sm:text-5xl text-mGreen"></i></div>
+            <span className="font-orbitron font-black text-lg sm:text-xl text-mGreen block uppercase tracking-widest text-center">ADMIN SALLE</span>
+            <span className="text-xs text-slate-500 text-center px-2">Creer et gerer une partie</span>
           </button>
-          <button onClick={() => setView('JOIN')} className="glass p-12 rounded-[3rem] border-mOrange/30 hover:border-mOrange transition-all group flex flex-col items-center space-y-6 shadow-2xl">
-            <div className="bg-mOrange/20 p-6 rounded-full group-hover:scale-110 transition-transform"><i className="fas fa-network-wired text-5xl text-mOrange"></i></div>
-            <span className="font-orbitron font-black text-xl text-mOrange block uppercase tracking-widest">REJOINDRE</span>
-            <span className="text-xs text-slate-500">Entrer dans une partie existante</span>
+          <button onClick={() => setView('JOIN')} className="glass p-8 sm:p-12 rounded-[2rem] sm:rounded-[3rem] border-mOrange/30 hover:border-mOrange transition-all group flex flex-col items-center space-y-4 sm:space-y-6 shadow-2xl">
+            <div className="bg-mOrange/20 p-4 sm:p-6 rounded-full group-hover:scale-110 transition-transform"><i className="fas fa-network-wired text-3xl sm:text-5xl text-mOrange"></i></div>
+            <span className="font-orbitron font-black text-lg sm:text-xl text-mOrange block uppercase tracking-widest text-center">REJOINDRE</span>
+            <span className="text-xs text-slate-500 text-center px-2">Entrer dans une partie existante</span>
           </button>
         </div>
         {onBack && (
@@ -356,29 +356,31 @@ const Lobby: React.FC<LobbyProps> = ({ onStart, onJoin, user, onBack }) => {
 
         {/* Liste des joueurs */}
         <div className="glass p-8 md:p-10 rounded-[2.5rem] border-mGreen/20 shadow-2xl flex flex-col">
-          <h2 className="text-xl md:text-2xl font-orbitron mb-8 text-mGreen flex justify-between items-center font-black">
-            <span>JOUEURS CONNECTES</span>
-            <span className="text-xs bg-mGreen/10 px-4 py-1.5 rounded-full">{players.length} SYNC</span>
+          <h2 className="text-lg md:text-xl font-orbitron mb-6 text-mGreen font-black">
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
+              <span className="text-sm sm:text-base">JOUEURS CONNECTES</span>
+              <span className="text-xs bg-mGreen/10 px-3 py-1 rounded-full self-start sm:self-auto">{players.length} SYNC</span>
+            </div>
           </h2>
           <div className="space-y-3 overflow-y-auto max-h-[400px] pr-2 flex-grow">
             {players.map(p => (
-              <div key={p.id} className={`p-4 rounded-2xl border ${p.id === currentPlayer.id ? 'border-mYellow/50 bg-mYellow/10' : 'border-mGreen/20 bg-mTeal/30'} flex items-center justify-between`}>
-                <div className="flex items-center space-x-4">
-                  <div className={`h-11 w-11 ${p.id === currentPlayer.id ? 'bg-mYellow/20' : 'bg-mGreen/20'} rounded-xl flex items-center justify-center ${p.id === currentPlayer.id ? 'text-mYellow' : 'text-mGreen'} font-black text-lg`}>
+              <div key={p.id} className={`p-3 sm:p-4 rounded-2xl border ${p.id === currentPlayer.id ? 'border-mYellow/50 bg-mYellow/10' : 'border-mGreen/20 bg-mTeal/30'} flex items-center justify-between`}>
+                <div className="flex items-center space-x-3 sm:space-x-4 min-w-0 flex-1">
+                  <div className={`h-10 w-10 sm:h-11 sm:w-11 ${p.id === currentPlayer.id ? 'bg-mYellow/20' : 'bg-mGreen/20'} rounded-xl flex items-center justify-center ${p.id === currentPlayer.id ? 'text-mYellow' : 'text-mGreen'} font-black text-base sm:text-lg flex-shrink-0`}>
                     {p.name.charAt(0).toUpperCase()}
                   </div>
-                  <div>
-                    <div className="font-bold text-white flex items-center gap-2">
-                      {p.name}
-                      {p.isManager && <i className="fas fa-crown text-[10px] text-mYellow"></i>}
-                      {p.id === currentPlayer.id && <span className="text-[10px] text-mYellow">(vous)</span>}
+                  <div className="min-w-0 flex-1">
+                    <div className="font-bold text-white flex items-center gap-2 text-sm sm:text-base">
+                      <span className="truncate">{p.name}</span>
+                      {p.isManager && <i className="fas fa-crown text-[10px] text-mYellow flex-shrink-0"></i>}
+                      {p.id === currentPlayer.id && <span className="text-[10px] text-mYellow flex-shrink-0">(vous)</span>}
                     </div>
-                    <div className="text-[9px] text-slate-500 font-bold uppercase">
+                    <div className="text-[9px] text-slate-500 font-bold uppercase truncate">
                       {p.categories.length > 0 ? p.categories.map(c => c.name).join(', ') : p.isManager ? 'Admin' : 'Pas de rubrique'}
                     </div>
                   </div>
                 </div>
-                <i className="fas fa-circle-check text-mGreen"></i>
+                <i className="fas fa-circle-check text-mGreen flex-shrink-0"></i>
               </div>
             ))}
             {players.length === 0 && (
@@ -575,9 +577,11 @@ const Lobby: React.FC<LobbyProps> = ({ onStart, onJoin, user, onBack }) => {
 
       {/* Liste des joueurs (visible seulement quand session existe pour admin) */}
       <div className="glass p-8 md:p-10 rounded-[2.5rem] border-mGreen/20 shadow-2xl flex flex-col">
-        <h2 className="text-xl md:text-2xl font-orbitron mb-8 text-mGreen flex justify-between items-center font-black">
-          <span>JOUEURS CONNECTES</span>
-          <span className="text-xs bg-mGreen/10 px-4 py-1.5 rounded-full">{players.length} SYNC</span>
+        <h2 className="text-lg md:text-xl font-orbitron mb-6 text-mGreen font-black">
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
+            <span className="text-sm sm:text-base">JOUEURS CONNECTES</span>
+            <span className="text-xs bg-mGreen/10 px-3 py-1 rounded-full self-start sm:self-auto">{players.length} SYNC</span>
+          </div>
         </h2>
         <div className="space-y-3 overflow-y-auto max-h-[400px] pr-2 flex-grow">
           {players.map(p => (
