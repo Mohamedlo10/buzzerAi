@@ -394,7 +394,7 @@ const App: React.FC = () => {
             <div className="absolute inset-0 border-8 border-mGreen/20 rounded-full"></div>
             <div className="absolute inset-0 border-8 border-t-mYellow rounded-full animate-spin"></div>
           </div>
-          <p className="text-xl font-orbitron font-bold text-mYellow tracking-widest animate-pulse">SUPABASE & GEMINI SYNC...</p>
+          <p className="text-xl font-orbitron font-bold text-mYellow tracking-widest animate-pulse">PREPARATION DE LA PARTIE...</p>
         </div>
       );
     }
