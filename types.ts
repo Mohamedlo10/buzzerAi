@@ -6,6 +6,19 @@ export enum GameStatus {
   RESULTS = 'RESULTS'
 }
 
+export enum AppView {
+  AUTH = 'AUTH',
+  HOME = 'HOME',
+  LOBBY = 'LOBBY',
+  GAME = 'GAME'
+}
+
+export interface User {
+  id: string;
+  username: string;
+  created_at?: string;
+}
+
 export interface PlayerCategory {
   name: string;
   difficulty: 'Facile' | 'Intermédiaire' | 'Expert';
@@ -33,6 +46,8 @@ export interface Question {
 export interface Buzz {
   playerId: string;
   timestamp: number;
+  timestampMs?: number;
+  timeDiffMs?: number;
 }
 
 export interface RoomState {

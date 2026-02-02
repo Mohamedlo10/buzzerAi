@@ -81,11 +81,16 @@ const ManagerView: React.FC<ManagerViewProps> = ({ state, onValidate, onSkip, on
           
           {playerOnTurn ? (
             <div className="space-y-6">
-              <div className="bg-mTeal p-6 rounded-2xl border-2 border-mGreen shadow-lg animate-pulse">
+              <div className="bg-mTeal p-6 rounded-2xl border-2 border-mGreen shadow-lg">
                 <div className="text-[10px] text-mGreen uppercase font-black mb-1 tracking-widest">Buzz en cours par :</div>
                 <div className="text-2xl font-bold text-white uppercase">{playerOnTurn.name}</div>
-                {/* Fixed: Used currentQ.category as 'category' is not a property of Player */}
                 <div className="text-sm text-mYellow font-medium">{currentQ?.category}</div>
+                {activeBuzzer?.timeDiffMs === 0 && (
+                  <div className="mt-2 flex items-center gap-2">
+                    <i className="fas fa-bolt text-mGreen text-xs"></i>
+                    <span className="text-xs text-mGreen font-orbitron font-bold">PREMIER !</span>
+                  </div>
+                )}
               </div>
 
               <div className="flex flex-col space-y-3">
@@ -155,14 +160,21 @@ const ManagerView: React.FC<ManagerViewProps> = ({ state, onValidate, onSkip, on
 
           {state.buzzedPlayers.length > 1 && (
             <div className="mt-8 pt-6 border-t border-mGreen/10">
-              <div className="text-[10px] text-mOrange uppercase font-bold mb-3 tracking-widest">Réservations :</div>
+              <div className="text-[10px] text-mOrange uppercase font-bold mb-3 tracking-widest">File d'attente avec delais :</div>
               <div className="space-y-2">
                 {state.buzzedPlayers.slice(1).map((b, i) => {
                   const p = state.players.find(pl => pl.id === b.playerId);
                   return (
-                    <div key={i} className="bg-mTeal/50 px-4 py-3 rounded-xl text-sm flex justify-between border border-mGreen/10">
+                    <div key={i} className="bg-mTeal/50 px-4 py-3 rounded-xl text-sm flex justify-between items-center border border-mGreen/10">
                       <span className="font-bold text-slate-300">{p?.name}</span>
-                      <span className="text-mYellow font-orbitron font-bold">POS #{i + 2}</span>
+                      <div className="flex items-center gap-3">
+                        {b.timeDiffMs !== undefined && (
+                          <span className="text-mSienna font-orbitron text-xs font-bold">
+                            +{b.timeDiffMs}ms
+                          </span>
+                        )}
+                        <span className="text-mYellow font-orbitron font-bold">POS #{i + 2}</span>
+                      </div>
                     </div>
                   );
                 })}
