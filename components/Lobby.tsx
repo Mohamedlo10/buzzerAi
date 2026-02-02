@@ -11,10 +11,11 @@ interface LobbyProps {
 }
 
 const Lobby: React.FC<LobbyProps> = ({ onStart, onJoin, user, onBack }) => {
-  const [view, setView] = useState<'CHOICE' | 'CREATE' | 'JOIN'>('CHOICE');
+  const [view, setView] = useState<'CHOICE' | 'CREATE' | 'JOIN' | 'WAITING'>('CHOICE');
   const [session, setSession] = useState<any>(null);
   const [players, setPlayers] = useState<Player[]>([]);
   const [managerName, setManagerName] = useState(user?.username || '');
+  const [currentPlayer, setCurrentPlayer] = useState<Player | null>(null);
 
   const [inputSessionCode, setInputSessionCode] = useState('');
   const [newPlayerName, setNewPlayerName] = useState(user?.username || '');
@@ -26,16 +27,29 @@ const Lobby: React.FC<LobbyProps> = ({ onStart, onJoin, user, onBack }) => {
   const [qPerUser, setQPerUser] = useState(3);
   const [myLocalId, setMyLocalId] = useState(localStorage.getItem('mdev_player_id') || "user-" + Math.random().toString(36).substr(2, 9));
   const [isJoining, setIsJoining] = useState(false);
-  const [alreadyJoined, setAlreadyJoined] = useState(false);
-  const [isRejoining, setIsRejoining] = useState(false);
 
   useEffect(() => {
-    // Sauvegarder le local ID
     localStorage.setItem('mdev_player_id', myLocalId);
   }, [myLocalId]);
 
+  // Subscription aux joueurs
   useEffect(() => {
     if (!session?.id) return;
+
+    // Charger les joueurs initiaux
+    const loadPlayers = async () => {
+      const { data } = await supabase.from('players').select('*').eq('session_id', session.id);
+      if (data) setPlayers(data.map(p => ({
+        id: p.local_id,
+        name: p.name,
+        categories: p.categories,
+        score: p.score,
+        categoryScores: p.category_scores,
+        isManager: p.is_manager
+      })));
+    };
+    loadPlayers();
+
     const playersSub = supabase
       .channel('lobby_players')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'players', filter: `session_id=eq.${session.id}` },
@@ -52,8 +66,26 @@ const Lobby: React.FC<LobbyProps> = ({ onStart, onJoin, user, onBack }) => {
         }
       )
       .subscribe();
-    return () => { supabase.removeChannel(playersSub); };
-  }, [session?.id]);
+
+    // Subscription aux changements de session (pour detecter le lancement du jeu)
+    const sessionSub = supabase
+      .channel('lobby_session')
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'sessions', filter: `id=eq.${session.id}` },
+        (payload) => {
+          const updated = payload.new as any;
+          if (updated.status !== 'LOBBY' && currentPlayer) {
+            // Le jeu a ete lance, rediriger vers le jeu
+            onJoin(currentPlayer, updated);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(playersSub);
+      supabase.removeChannel(sessionSub);
+    };
+  }, [session?.id, currentPlayer]);
 
   const handleCreateRoom = async () => {
     if (!managerName.trim()) return alert("Nom requis");
@@ -87,6 +119,7 @@ const Lobby: React.FC<LobbyProps> = ({ onStart, onJoin, user, onBack }) => {
     });
 
     setSession(sess);
+    setCurrentPlayer(p);
     onJoin(p, sess);
   };
 
@@ -107,6 +140,40 @@ const Lobby: React.FC<LobbyProps> = ({ onStart, onJoin, user, onBack }) => {
         return alert("Session introuvable");
       }
 
+      // Si la session n'est pas en LOBBY, rediriger directement vers le jeu
+      if (sess.status !== 'LOBBY') {
+        // Verifier si le joueur existe deja
+        const { data: existingByName } = await supabase
+          .from('players')
+          .select('*')
+          .eq('session_id', sess.id)
+          .eq('name', newPlayerName.trim())
+          .single();
+
+        if (existingByName) {
+          await supabase
+            .from('players')
+            .update({ local_id: myLocalId, user_id: user?.id || null })
+            .eq('id', existingByName.id);
+
+          const p: Player = {
+            id: myLocalId,
+            name: existingByName.name,
+            categories: existingByName.categories || [],
+            score: existingByName.score || 0,
+            categoryScores: existingByName.category_scores || {},
+            isManager: existingByName.is_manager
+          };
+
+          localStorage.setItem('mdev_player_id', myLocalId);
+          setIsJoining(false);
+          onJoin(p, sess);
+          return;
+        }
+        setIsJoining(false);
+        return alert("La partie est deja en cours et vous n'etes pas inscrit");
+      }
+
       // 1. Verifier si le joueur existe deja par local_id
       const { data: existingByLocalId } = await supabase
         .from('players')
@@ -116,7 +183,6 @@ const Lobby: React.FC<LobbyProps> = ({ onStart, onJoin, user, onBack }) => {
         .single();
 
       if (existingByLocalId) {
-        // Rejoin avec le meme local_id
         const p: Player = {
           id: existingByLocalId.local_id,
           name: existingByLocalId.name,
@@ -126,13 +192,13 @@ const Lobby: React.FC<LobbyProps> = ({ onStart, onJoin, user, onBack }) => {
           isManager: existingByLocalId.is_manager
         };
         setIsJoining(false);
-        setIsRejoining(true);
         setSession(sess);
-        onJoin(p, sess);
+        setCurrentPlayer(p);
+        setView('WAITING');
         return;
       }
 
-      // 2. Verifier si un joueur avec le meme username existe (pour les invites)
+      // 2. Verifier si un joueur avec le meme username existe
       const { data: existingByName } = await supabase
         .from('players')
         .select('*')
@@ -141,8 +207,6 @@ const Lobby: React.FC<LobbyProps> = ({ onStart, onJoin, user, onBack }) => {
         .single();
 
       if (existingByName) {
-        // REJOIN INVITE: Utiliser les donnees existantes (categories deja sauvees)
-        // Mettre a jour le local_id dans la base pour le nouveau navigateur
         await supabase
           .from('players')
           .update({ local_id: myLocalId, user_id: user?.id || null })
@@ -159,18 +223,13 @@ const Lobby: React.FC<LobbyProps> = ({ onStart, onJoin, user, onBack }) => {
 
         localStorage.setItem('mdev_player_id', myLocalId);
         setIsJoining(false);
-        setIsRejoining(true);
         setSession(sess);
-        onJoin(p, sess);
+        setCurrentPlayer(p);
+        setView('WAITING');
         return;
       }
 
-      // 3. Nouveau joueur - verifier les categories
-      if (tempCategories.length === 0) {
-        setIsJoining(false);
-        return alert("Veuillez ajouter au moins une rubrique (tapez le nom puis cliquez sur +)");
-      }
-
+      // 3. Nouveau joueur - les categories sont optionnelles maintenant
       const p: Player = {
         id: myLocalId,
         name: newPlayerName,
@@ -190,7 +249,9 @@ const Lobby: React.FC<LobbyProps> = ({ onStart, onJoin, user, onBack }) => {
       });
 
       setSession(sess);
-      onJoin(p, sess);
+      setCurrentPlayer(p);
+      setView('WAITING');
+      setIsJoining(false);
     } catch (err) {
       console.error(err);
       setIsJoining(false);
@@ -208,18 +269,13 @@ const Lobby: React.FC<LobbyProps> = ({ onStart, onJoin, user, onBack }) => {
     setTempCategories(tempCategories.filter((_, i) => i !== index));
   };
 
+  // Vue de choix initial
   if (view === 'CHOICE') {
     return (
       <div className="flex flex-col items-center justify-center space-y-12 animate-fade-in py-12">
         <div className="text-center">
           <h2 className="text-4xl md:text-5xl font-orbitron text-mYellow font-bold mb-4">MDEV CLOUD BUZZ</h2>
           <p className="text-mGreen font-orbitron text-xs tracking-[0.4em] uppercase opacity-80">Sync via Supabase Realtime</p>
-          {user && (
-            <p className="text-mOrange text-sm mt-2">
-              <i className="fas fa-user mr-2"></i>
-              Connecte en tant que <span className="font-bold">{user.username}</span>
-            </p>
-          )}
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 w-full max-w-4xl">
           <button onClick={() => setView('CREATE')} className="glass p-12 rounded-[3rem] border-mGreen/30 hover:border-mGreen transition-all group flex flex-col items-center space-y-6 shadow-2xl">
@@ -236,13 +292,89 @@ const Lobby: React.FC<LobbyProps> = ({ onStart, onJoin, user, onBack }) => {
         {onBack && (
           <button onClick={onBack} className="text-slate-500 uppercase font-bold text-sm tracking-widest hover:text-mYellow transition-colors">
             <i className="fas fa-arrow-left mr-2"></i>
-            Retour au dashboard
+            Retour
           </button>
         )}
       </div>
     );
   }
 
+  // Vue d'attente pour les joueurs qui ont rejoint
+  if (view === 'WAITING' && session && currentPlayer) {
+    return (
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 animate-fade-in">
+        {/* Info joueur */}
+        <div className="glass p-8 md:p-10 rounded-[2.5rem] border-mYellow/20 flex flex-col shadow-2xl">
+          <div className="text-center space-y-6">
+            <div className="bg-mGreen/20 w-24 h-24 rounded-full mx-auto flex items-center justify-center">
+              <i className="fas fa-check text-4xl text-mGreen"></i>
+            </div>
+            <div>
+              <h2 className="text-2xl font-orbitron text-mGreen font-bold">VOUS AVEZ REJOINT !</h2>
+              <p className="text-slate-400 mt-2">Session: <span className="text-mYellow font-orbitron font-bold">{session.code}</span></p>
+            </div>
+            <div className="bg-mTeal/50 p-6 rounded-2xl border border-mGreen/20">
+              <div className="text-xs text-mOrange uppercase font-bold tracking-widest mb-2">Votre pseudo</div>
+              <div className="text-2xl font-bold text-white">{currentPlayer.name}</div>
+              {currentPlayer.categories.length > 0 && (
+                <div className="mt-3 flex flex-wrap gap-2 justify-center">
+                  {currentPlayer.categories.map((c, i) => (
+                    <span key={i} className="bg-mTeal px-3 py-1 rounded-full text-[10px] border border-mGreen/20">
+                      {c.name} ({c.difficulty})
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="animate-pulse">
+              <i className="fas fa-spinner fa-spin text-mYellow text-2xl mb-3"></i>
+              <p className="text-mYellow font-bold uppercase tracking-widest text-sm">
+                En attente que l'admin demarre la partie...
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Liste des joueurs */}
+        <div className="glass p-8 md:p-10 rounded-[2.5rem] border-mGreen/20 shadow-2xl flex flex-col">
+          <h2 className="text-xl md:text-2xl font-orbitron mb-8 text-mGreen flex justify-between items-center font-black">
+            <span>JOUEURS CONNECTES</span>
+            <span className="text-xs bg-mGreen/10 px-4 py-1.5 rounded-full">{players.length} SYNC</span>
+          </h2>
+          <div className="space-y-3 overflow-y-auto max-h-[400px] pr-2 flex-grow">
+            {players.map(p => (
+              <div key={p.id} className={`p-4 rounded-2xl border ${p.id === currentPlayer.id ? 'border-mYellow/50 bg-mYellow/10' : 'border-mGreen/20 bg-mTeal/30'} flex items-center justify-between`}>
+                <div className="flex items-center space-x-4">
+                  <div className={`h-11 w-11 ${p.id === currentPlayer.id ? 'bg-mYellow/20' : 'bg-mGreen/20'} rounded-xl flex items-center justify-center ${p.id === currentPlayer.id ? 'text-mYellow' : 'text-mGreen'} font-black text-lg`}>
+                    {p.name.charAt(0).toUpperCase()}
+                  </div>
+                  <div>
+                    <div className="font-bold text-white flex items-center gap-2">
+                      {p.name}
+                      {p.isManager && <i className="fas fa-crown text-[10px] text-mYellow"></i>}
+                      {p.id === currentPlayer.id && <span className="text-[10px] text-mYellow">(vous)</span>}
+                    </div>
+                    <div className="text-[9px] text-slate-500 font-bold uppercase">
+                      {p.categories.length > 0 ? p.categories.map(c => c.name).join(', ') : p.isManager ? 'Admin' : 'Pas de rubrique'}
+                    </div>
+                  </div>
+                </div>
+                <i className="fas fa-circle-check text-mGreen"></i>
+              </div>
+            ))}
+            {players.length === 0 && (
+              <div className="text-center py-16 text-slate-600">
+                <i className="fas fa-satellite-dish text-4xl mb-4 opacity-30"></i>
+                <p className="italic">Chargement...</p>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Vue de creation/join
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 animate-fade-in">
       <div className="glass p-8 md:p-10 rounded-[2.5rem] border-mYellow/20 flex flex-col shadow-2xl">
@@ -293,13 +425,13 @@ const Lobby: React.FC<LobbyProps> = ({ onStart, onJoin, user, onBack }) => {
                 </p>
               </div>
             )}
-            <button onClick={() => setView('CHOICE')} className="w-full text-slate-500 uppercase font-bold text-[10px] tracking-widest hover:text-mYellow transition-colors">
+            <button onClick={() => { setView('CHOICE'); setSession(null); }} className="w-full text-slate-500 uppercase font-bold text-[10px] tracking-widest hover:text-mYellow transition-colors">
               <i className="fas fa-arrow-left mr-1"></i> Retour
             </button>
           </div>
         ) : (
           <div className="space-y-6">
-            <h2 className="text-2xl md:text-3xl font-orbitron text-mOrange font-black">ENTREE CLOUD</h2>
+            <h2 className="text-2xl md:text-3xl font-orbitron text-mOrange font-black">REJOINDRE</h2>
             <div className="space-y-4">
               <div>
                 <label className="block text-xs text-mOrange uppercase font-bold tracking-widest mb-2 ml-2">
@@ -334,7 +466,10 @@ const Lobby: React.FC<LobbyProps> = ({ onStart, onJoin, user, onBack }) => {
 
               <div className="p-5 bg-mTeal/20 border border-mOrange/30 rounded-2xl space-y-4">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs text-mOrange uppercase font-bold">Vos rubriques</span>
+                  <div>
+                    <span className="text-xs text-mOrange uppercase font-bold">Vos rubriques</span>
+                    <span className="text-[10px] text-slate-500 ml-2">(optionnel)</span>
+                  </div>
                   <select
                     className="bg-mTeal/50 text-xs px-3 py-1.5 rounded-lg border border-mGreen/20"
                     value={difficultyInput}
@@ -374,30 +509,23 @@ const Lobby: React.FC<LobbyProps> = ({ onStart, onJoin, user, onBack }) => {
                     </span>
                   ))}
                   {tempCategories.length === 0 && (
-                    <span className="text-slate-500 text-xs italic">Ajoutez vos rubriques pour jouer</span>
+                    <span className="text-slate-500 text-xs italic">
+                      <i className="fas fa-lightbulb mr-1 text-mYellow"></i>
+                      Ajoutez des rubriques pour personnaliser les questions (facultatif)
+                    </span>
                   )}
                 </div>
               </div>
 
               <button
                 onClick={handleJoinFinal}
-                disabled={isJoining || alreadyJoined}
+                disabled={isJoining}
                 className="w-full bg-mOrange text-mTeal py-5 rounded-2xl font-orbitron font-black text-xl uppercase tracking-widest disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3 hover:bg-mOrange/90 transition-all"
               >
                 {isJoining ? (
                   <>
                     <i className="fas fa-spinner fa-spin"></i>
                     CONNEXION...
-                  </>
-                ) : isRejoining ? (
-                  <>
-                    <i className="fas fa-check-circle"></i>
-                    RECONNECTE !
-                  </>
-                ) : alreadyJoined ? (
-                  <>
-                    <i className="fas fa-check-circle"></i>
-                    DEJA INSCRIT
                   </>
                 ) : (
                   <>
@@ -414,9 +542,10 @@ const Lobby: React.FC<LobbyProps> = ({ onStart, onJoin, user, onBack }) => {
         )}
       </div>
 
+      {/* Liste des joueurs (visible seulement quand session existe pour admin) */}
       <div className="glass p-8 md:p-10 rounded-[2.5rem] border-mGreen/20 shadow-2xl flex flex-col">
         <h2 className="text-xl md:text-2xl font-orbitron mb-8 text-mGreen flex justify-between items-center font-black">
-          <span>PRESENCES CLOUD</span>
+          <span>JOUEURS CONNECTES</span>
           <span className="text-xs bg-mGreen/10 px-4 py-1.5 rounded-full">{players.length} SYNC</span>
         </h2>
         <div className="space-y-3 overflow-y-auto max-h-[400px] pr-2 flex-grow">
@@ -430,7 +559,7 @@ const Lobby: React.FC<LobbyProps> = ({ onStart, onJoin, user, onBack }) => {
                     {p.isManager && <i className="fas fa-crown text-[10px] text-mYellow"></i>}
                   </div>
                   <div className="text-[9px] text-slate-500 font-bold uppercase">
-                    {p.categories.length > 0 ? p.categories.map(c => c.name).join(', ') : 'Admin'}
+                    {p.categories.length > 0 ? p.categories.map(c => c.name).join(', ') : p.isManager ? 'Admin' : 'Pas de rubrique'}
                   </div>
                 </div>
               </div>
@@ -441,6 +570,9 @@ const Lobby: React.FC<LobbyProps> = ({ onStart, onJoin, user, onBack }) => {
             <div className="text-center py-16 text-slate-600">
               <i className="fas fa-satellite-dish text-4xl mb-4 opacity-30"></i>
               <p className="italic">En attente de connexion...</p>
+              {view === 'JOIN' && (
+                <p className="text-xs mt-2 text-slate-500">Les joueurs apparaitront ici apres avoir rejoint</p>
+              )}
             </div>
           )}
         </div>

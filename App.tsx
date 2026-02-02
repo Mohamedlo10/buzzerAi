@@ -14,9 +14,9 @@ import HomePage from './components/HomePage';
 const App: React.FC = () => {
   // Auth state
   const [user, setUser] = useState<User | null>(authService.getCurrentUser());
-  const [appView, setAppView] = useState<AppView>(
-    authService.getCurrentUser() ? AppView.HOME : AppView.AUTH
-  );
+  const [appView, setAppView] = useState<AppView>(AppView.LOBBY);
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
 
   // Game state
   const [session, setSession] = useState<any>(null);
@@ -345,29 +345,6 @@ const App: React.FC = () => {
   };
 
   const renderContent = () => {
-    // Auth page
-    if (appView === AppView.AUTH) {
-      return (
-        <AuthPage
-          onAuthenticated={handleAuthenticated}
-          onSkipAuth={handleSkipAuth}
-        />
-      );
-    }
-
-    // Home page (logged in users)
-    if (appView === AppView.HOME && user) {
-      return (
-        <HomePage
-          user={user}
-          onLogout={handleLogout}
-          onCreateSession={() => setAppView(AppView.LOBBY)}
-          onJoinSession={() => setAppView(AppView.LOBBY)}
-          onRejoinSession={handleRejoinSession}
-        />
-      );
-    }
-
     // Lobby
     if (appView === AppView.LOBBY || status === GameStatus.LOBBY) {
       return (
@@ -455,20 +432,49 @@ const App: React.FC = () => {
             Live Platform <span className="text-mYellow">by Mouha_Dev</span>
           </p>
         </div>
-        <div className="flex flex-col items-end gap-2">
-          {user && appView !== AppView.AUTH && (
-            <div className="glass px-3 py-1.5 rounded-full flex items-center space-x-2 border-mYellow/30 bg-mYellow/5">
-              <i className="fas fa-user text-mYellow text-xs"></i>
-              <span className="text-[10px] font-bold text-mYellow uppercase tracking-wider">{user.username}</span>
+        <div className="flex items-center gap-3">
+          {/* Boutons connexion/inscription si non connecte */}
+          {!user && !session && (
+            <div className="flex gap-2">
+              <button
+                onClick={() => { setAuthMode('login'); setShowAuthModal(true); }}
+                className="glass px-4 py-2 rounded-xl text-xs font-bold text-mGreen border border-mGreen/30 hover:bg-mGreen/10 transition-all"
+              >
+                <i className="fas fa-sign-in-alt mr-2"></i>
+                Connexion
+              </button>
+              <button
+                onClick={() => { setAuthMode('signup'); setShowAuthModal(true); }}
+                className="bg-mYellow text-mTeal px-4 py-2 rounded-xl text-xs font-bold hover:bg-mYellow/90 transition-all"
+              >
+                <i className="fas fa-user-plus mr-2"></i>
+                Inscription
+              </button>
             </div>
           )}
+          {/* User connecte */}
+          {user && (
+            <div className="flex items-center gap-3">
+              <div className="glass px-3 py-1.5 rounded-full flex items-center space-x-2 border-mYellow/30 bg-mYellow/5">
+                <i className="fas fa-user text-mYellow text-xs"></i>
+                <span className="text-[10px] font-bold text-mYellow uppercase tracking-wider">{user.username}</span>
+              </div>
+              <button
+                onClick={handleLogout}
+                className="text-slate-500 hover:text-mSienna text-xs transition-colors"
+                title="Deconnexion"
+              >
+                <i className="fas fa-sign-out-alt"></i>
+              </button>
+            </div>
+          )}
+          {/* Session active */}
           {currentPlayerId && session && (
-            <div className="flex flex-col items-end">
+            <div className="flex flex-col items-end ml-2">
               <div className="glass px-3 py-1.5 rounded-full flex items-center space-x-2 border-mGreen/30 bg-mGreen/5">
                 <div className="h-2 w-2 rounded-full bg-mGreen animate-pulse"></div>
                 <span className="text-[10px] font-black text-mGreen font-orbitron uppercase tracking-widest">Session: {session.code}</span>
               </div>
-              <span className="text-[8px] text-slate-500 mt-1 uppercase font-bold tracking-tighter">Syncing via Supabase Realtime</span>
             </div>
           )}
         </div>
@@ -477,6 +483,28 @@ const App: React.FC = () => {
       <main className="flex-grow">
         {renderContent()}
       </main>
+
+      {/* Modal d'authentification */}
+      {showAuthModal && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+          <div className="relative max-w-md w-full">
+            <button
+              onClick={() => setShowAuthModal(false)}
+              className="absolute -top-10 right-0 text-slate-400 hover:text-white text-xl"
+            >
+              <i className="fas fa-times"></i>
+            </button>
+            <AuthPage
+              onAuthenticated={(u) => {
+                setUser(u);
+                setShowAuthModal(false);
+              }}
+              onSkipAuth={() => setShowAuthModal(false)}
+              initialMode={authMode}
+            />
+          </div>
+        </div>
+      )}
 
       <footer className="mt-20 py-6 border-t border-mGreen/20 text-center text-[8px] text-slate-600 font-bold uppercase tracking-[0.5em]">
         <p>BUZZMASTER CLOUD &copy; 2025 | MDEV GLOBAL INFRA | POWERED BY SUPABASE</p>

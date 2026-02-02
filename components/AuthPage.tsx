@@ -5,10 +5,11 @@ import { User } from '../types';
 interface AuthPageProps {
   onAuthenticated: (user: User) => void;
   onSkipAuth: () => void;
+  initialMode?: 'login' | 'signup';
 }
 
-const AuthPage: React.FC<AuthPageProps> = ({ onAuthenticated, onSkipAuth }) => {
-  const [mode, setMode] = useState<'login' | 'signup'>('login');
+const AuthPage: React.FC<AuthPageProps> = ({ onAuthenticated, onSkipAuth, initialMode = 'login' }) => {
+  const [mode, setMode] = useState<'login' | 'signup'>(initialMode);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
