@@ -1,5 +1,6 @@
 import { supabase } from '../supabaseClient';
 import { User } from '../types';
+import { rpcService } from './rpcService';
 
 export interface AuthResult {
   success: boolean;
@@ -134,70 +135,12 @@ export const authService = {
     }
   },
 
+  /**
+   * Utilise RPC pour récupérer les sessions actives - élimine N+1 queries
+   */
   async getUserActiveSessions(userId: string): Promise<ActiveSession[]> {
-    // Recuperer les sessions creees par l'utilisateur
-    const { data: ownedSessions, error: ownedError } = await supabase
-      .from('sessions')
-      .select('id, code, status, created_at')
-      .eq('user_id', userId)
-      .in('status', ['LOBBY', 'PLAYING', 'GENERATING'])
-      .order('created_at', { ascending: false });
-
-    if (ownedError) {
-      console.error('Error fetching owned sessions:', ownedError);
-      return [];
-    }
-
-    // Recuperer les sessions ou l'utilisateur est joueur
-    const { data: playerSessions, error: playerError } = await supabase
-      .from('players')
-      .select('session_id, sessions(id, code, status, created_at)')
-      .eq('user_id', userId);
-
-    if (playerError) {
-      console.error('Error fetching player sessions:', playerError);
-    }
-
-    // Combiner et dedupliquer
-    const sessionsMap = new Map<string, ActiveSession>();
-
-    // Ajouter les sessions possedees
-    for (const sess of ownedSessions || []) {
-      // Compter les joueurs
-      const { count } = await supabase
-        .from('players')
-        .select('*', { count: 'exact', head: true })
-        .eq('session_id', sess.id);
-
-      sessionsMap.set(sess.id, {
-        id: sess.id,
-        code: sess.code,
-        status: sess.status,
-        created_at: sess.created_at,
-        player_count: count || 0
-      });
-    }
-
-    // Ajouter les sessions en tant que joueur
-    for (const p of playerSessions || []) {
-      const sess = p.sessions as any;
-      if (sess && !sessionsMap.has(sess.id) && ['LOBBY', 'PLAYING', 'GENERATING'].includes(sess.status)) {
-        const { count } = await supabase
-          .from('players')
-          .select('*', { count: 'exact', head: true })
-          .eq('session_id', sess.id);
-
-        sessionsMap.set(sess.id, {
-          id: sess.id,
-          code: sess.code,
-          status: sess.status,
-          created_at: sess.created_at,
-          player_count: count || 0
-        });
-      }
-    }
-
-    return Array.from(sessionsMap.values());
+    const dashboard = await rpcService.getUserDashboard(userId);
+    return dashboard.activeSessions;
   },
 
   async checkUsernameAvailable(username: string): Promise<boolean> {
@@ -210,61 +153,19 @@ export const authService = {
     return !data;
   },
 
+  /**
+   * Utilise RPC pour récupérer l'historique - élimine N+1 queries
+   */
   async getUserGameHistory(userId: string): Promise<GameHistory[]> {
-    // Recuperer toutes les sessions ou l'utilisateur a joue (terminees)
-    const { data: playerData, error } = await supabase
-      .from('players')
-      .select(`
-        score,
-        is_manager,
-        session_id,
-        sessions (
-          id,
-          code,
-          status,
-          created_at
-        )
-      `)
-      .eq('user_id', userId);
+    const dashboard = await rpcService.getUserDashboard(userId);
+    return dashboard.gameHistory;
+  },
 
-    if (error || !playerData) {
-      console.error('Error fetching game history:', error);
-      return [];
-    }
-
-    const history: GameHistory[] = [];
-
-    for (const p of playerData) {
-      const sess = p.sessions as any;
-      if (!sess || sess.status !== 'RESULTS') continue;
-
-      // Recuperer tous les joueurs de cette session pour le classement
-      const { data: allPlayers } = await supabase
-        .from('players')
-        .select('name, score')
-        .eq('session_id', sess.id)
-        .order('score', { ascending: false });
-
-      const playerCount = allPlayers?.length || 0;
-      const myRank = allPlayers?.findIndex(pl => pl.score <= p.score) ?? 0;
-      const winner = allPlayers?.[0];
-
-      history.push({
-        id: sess.id,
-        code: sess.code,
-        status: sess.status,
-        created_at: sess.created_at,
-        player_count: playerCount,
-        my_score: p.score,
-        my_rank: myRank + 1,
-        is_manager: p.is_manager,
-        winner_name: winner?.name,
-        winner_score: winner?.score
-      });
-    }
-
-    // Trier par date decroissante
-    return history.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  /**
+   * Nouvelle méthode optimisée: récupère activeSessions + gameHistory en un seul appel
+   */
+  async getUserDashboard(userId: string): Promise<{ activeSessions: ActiveSession[]; gameHistory: GameHistory[] }> {
+    return rpcService.getUserDashboard(userId);
   },
 
   async getSessionsByUsername(username: string): Promise<ActiveSession[]> {

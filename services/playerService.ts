@@ -1,5 +1,6 @@
 import { supabase } from '../supabaseClient';
 import { Player, PlayerCategory } from '../types';
+import { rpcService } from './rpcService';
 
 export interface PlayerDbData {
   id: string;
@@ -13,29 +14,13 @@ export interface PlayerDbData {
   user_id?: string;
 }
 
-// Convertit les données DB en format Player
-const mapDbToPlayer = (dbPlayer: PlayerDbData): Player => ({
-  id: dbPlayer.local_id,
-  name: dbPlayer.name,
-  categories: dbPlayer.categories || [],
-  score: dbPlayer.score || 0,
-  categoryScores: dbPlayer.category_scores || {},
-  isManager: dbPlayer.is_manager
-});
-
 export const playerService = {
+  /**
+   * Utilise RPC pour récupérer les joueurs - pas de mapping frontend
+   * Les données sont retournées directement au format Player (camelCase)
+   */
   async getPlayersBySession(sessionId: string): Promise<Player[]> {
-    const { data, error } = await supabase
-      .from('players')
-      .select('*')
-      .eq('session_id', sessionId);
-
-    if (error) {
-      console.error('Error fetching players:', error);
-      return [];
-    }
-
-    return (data || []).map(mapDbToPlayer);
+    return rpcService.getSessionPlayers(sessionId);
   },
 
   async getPlayerByLocalId(sessionId: string, localId: string): Promise<PlayerDbData | null> {
@@ -146,7 +131,5 @@ export const playerService = {
 
   generateLocalId(): string {
     return 'user-' + Math.random().toString(36).substr(2, 9);
-  },
-
-  mapDbToPlayer
+  }
 };

@@ -8,6 +8,7 @@ import { playerService } from './services/playerService';
 import { questionService } from './services/questionService';
 import { buzzService } from './services/buzzService';
 import { realtimeService } from './services/realtimeService';
+import { rpcService } from './services/rpcService';
 import Lobby from './components/Lobby';
 import ManagerView from './components/ManagerView';
 import PlayerView from './components/PlayerView';
@@ -32,7 +33,7 @@ const App: React.FC = () => {
   const [currentPlayerId, setCurrentPlayerId] = useState<string | null>(localStorage.getItem('mdev_player_id'));
   const [status, setStatus] = useState<GameStatus>(GameStatus.LOBBY);
 
-  // Fonction pour recuperer l'etat des buzzes avec timing en millisecondes
+  // Fonction pour recuperer l'etat des buzzes - utilise RPC via buzzService
   const fetchBuzzState = async (sessionId?: string) => {
     const sid = sessionId || session?.id;
     if (!sid) return;
@@ -132,35 +133,45 @@ const App: React.FC = () => {
     });
   };
 
+  /**
+   * Utilise RPC validate_answer pour une transaction atomique
+   * Combine: update score + delete buzz + advance question
+   */
   const validateAnswer = async (playerId: string | null, points: number, moveNext: boolean) => {
     if (!session) return;
 
-    if (playerId) {
-      const p = players.find(pl => pl.id === playerId);
-      if (p) {
-        const newScore = p.score + points;
-        const currentQ = questions[session.current_question_index];
-        const newCatScores = { ...p.categoryScores };
-        if (points > 0) {
-          newCatScores[currentQ.category] = (newCatScores[currentQ.category] || 0) + 1;
-        }
-        await playerService.updatePlayerScore(session.id, playerId, newScore, newCatScores);
-      }
+    const currentQ = questions[session.current_question_index];
+
+    const result = await rpcService.validateAnswer(
+      session.id,
+      playerId,
+      points,
+      currentQ?.category || '',
+      moveNext,
+      questions.length
+    );
+
+    if (!result?.success) {
+      console.error('validateAnswer RPC failed');
+      return;
+    }
+
+    // Mise a jour optimiste du score local
+    if (playerId && points !== 0) {
+      setPlayers(prev => prev.map(p =>
+        p.id === playerId
+          ? { ...p, score: result.playerNewScore, categoryScores: result.playerNewCategoryScores as Record<string, number> }
+          : p
+      ));
     }
 
     if (moveNext) {
-      // Bonne reponse: reset tous les buzzes et passer a la question suivante
-      await buzzService.deleteAllBuzzes(session.id);
+      // Bonne reponse: reset local des buzzes
       setBuzzedPlayers([]);
-      const nextIndex = session.current_question_index + 1;
-      const isGameOver = nextIndex >= questions.length;
-      await sessionService.advanceToNextQuestion(session.id, nextIndex, isGameOver);
     } else if (playerId) {
-      // Mauvaise reponse: retirer seulement ce joueur - passage AUTOMATIQUE au suivant
-      await buzzService.deletePlayerBuzz(session.id, playerId);
+      // Mauvaise reponse: retirer seulement ce joueur localement
       setBuzzedPlayers(prev => {
         const filtered = prev.filter(b => b.playerId !== playerId);
-        // Recalculer les timeDiffMs avec le nouveau premier
         if (filtered.length > 0) {
           const firstMs = filtered[0].timestampMs || filtered[0].timestamp;
           return filtered.map((b, i) => ({
@@ -188,50 +199,50 @@ const App: React.FC = () => {
     await sessionService.advanceToNextQuestion(session.id, nextIndex, isGameOver);
   };
 
-  // Handler pour rejoindre une session depuis HomePage
-  const handleRejoinSession = async (sessionId: string, sessionCode: string) => {
-    const sess = await sessionService.getSessionById(sessionId);
+  /**
+   * Utilise RPC rejoin_session pour charger l'état complet en un seul appel
+   * Remplace 5 requêtes séquentielles par 1 RPC
+   */
+  const handleRejoinSession = async (sessionId: string, _sessionCode: string) => {
+    const storedPlayerId = localStorage.getItem('mdev_player_id') || '';
+    const username = user?.username || '';
 
-    if (!sess) {
+    const result = await rpcService.rejoinSession(sessionId, username, storedPlayerId);
+
+    if (!result || !result.sessionId) {
       alert('Session introuvable');
       return;
     }
 
-    // Chercher si on est deja joueur - d'abord par username si connecte
-    let existingPlayer = null;
+    if (result.foundPlayerId) {
+      // Joueur trouvé - charger tout l'état depuis le RPC
+      setCurrentPlayerId(result.foundPlayerId);
+      localStorage.setItem('mdev_player_id', result.foundPlayerId);
 
-    if (user) {
-      existingPlayer = await playerService.getPlayerByUsername(sessionId, user.username);
-    }
+      setSession({
+        id: result.sessionId,
+        code: result.sessionCode,
+        status: result.sessionStatus,
+        current_question_index: result.currentQuestionIndex,
+        debt_amount: result.debtAmount,
+        q_per_user: result.qPerUser
+      });
+      setStatus(result.sessionStatus as GameStatus);
+      setPlayers(result.players);
+      setQuestions(result.questions);
+      setBuzzedPlayers(result.buzzes);
 
-    // Sinon chercher par local_id
-    if (!existingPlayer) {
-      const storedPlayerId = localStorage.getItem('mdev_player_id');
-      if (storedPlayerId) {
-        existingPlayer = await playerService.getPlayerByLocalId(sessionId, storedPlayerId);
-      }
-    }
-
-    if (existingPlayer) {
-      setCurrentPlayerId(existingPlayer.local_id);
-      localStorage.setItem('mdev_player_id', existingPlayer.local_id);
-      setSession(sess);
-      setStatus(sess.status as GameStatus);
-
-      // Charger les joueurs et questions
-      const playersData = await playerService.getPlayersBySession(sessionId);
-      setPlayers(playersData);
-
-      const questionsData = await questionService.getQuestionsBySession(sessionId);
-      setQuestions(questionsData);
-
-      await fetchBuzzState(sessionId);
       setAppView(AppView.GAME);
       return;
     }
 
-    // Sinon, aller au lobby pour rejoindre
-    setSession(sess);
+    // Joueur non trouvé - aller au lobby pour rejoindre
+    setSession({
+      id: result.sessionId,
+      code: result.sessionCode,
+      status: result.sessionStatus,
+      current_question_index: result.currentQuestionIndex
+    });
     setAppView(AppView.LOBBY);
   };
 

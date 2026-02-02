@@ -1,5 +1,6 @@
 import { supabase } from '../supabaseClient';
 import { Buzz } from '../types';
+import { rpcService } from './rpcService';
 
 export interface BuzzDbData {
   id: string;
@@ -10,33 +11,12 @@ export interface BuzzDbData {
 }
 
 export const buzzService = {
+  /**
+   * Utilise RPC pour récupérer les buzzes - timeDiffMs pré-calculé côté serveur
+   * Élimine le calcul client-side et retourne directement au format Buzz
+   */
   async getBuzzesBySession(sessionId: string): Promise<Buzz[]> {
-    const { data, error } = await supabase
-      .from('buzzes')
-      .select('*')
-      .eq('session_id', sessionId)
-      .order('buzz_timestamp_ms', { ascending: true, nullsFirst: false });
-
-    if (error) {
-      console.error('Error fetching buzzes:', error);
-      return [];
-    }
-
-    if (!data || data.length === 0) {
-      return [];
-    }
-
-    const firstBuzzMs = data[0].buzz_timestamp_ms || new Date(data[0].created_at).getTime();
-
-    return data.map((b, index) => {
-      const buzzMs = b.buzz_timestamp_ms || new Date(b.created_at).getTime();
-      return {
-        playerId: b.player_local_id,
-        timestamp: new Date(b.created_at).getTime(),
-        timestampMs: buzzMs,
-        timeDiffMs: index === 0 ? 0 : buzzMs - firstBuzzMs
-      };
-    });
+    return rpcService.getBuzzState(sessionId);
   },
 
   async createBuzz(sessionId: string, playerLocalId: string): Promise<{ success: boolean; alreadyBuzzed?: boolean }> {
