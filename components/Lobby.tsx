@@ -35,6 +35,14 @@ const Lobby: React.FC<LobbyProps> = ({ onStart, onJoin, user, onBack }) => {
     localStorage.setItem('mdev_player_id', myLocalId);
   }, [myLocalId]);
 
+  // Synchroniser le username quand l'utilisateur change
+  useEffect(() => {
+    if (user?.username) {
+      setManagerName(user.username);
+      setNewPlayerName(user.username);
+    }
+  }, [user?.username]);
+
   // Subscription aux joueurs
   useEffect(() => {
     if (!session?.id) return;

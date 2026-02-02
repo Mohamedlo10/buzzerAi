@@ -260,47 +260,65 @@ const App: React.FC = () => {
       .from('sessions')
       .select('*')
       .eq('id', sessionId)
-      .single();
+      .maybeSingle();
 
     if (!sess) {
       alert('Session introuvable');
       return;
     }
 
-    // Chercher si on est deja joueur
-    const storedPlayerId = localStorage.getItem('mdev_player_id');
-    if (storedPlayerId) {
-      const { data: existingPlayer } = await supabase
+    // Chercher si on est deja joueur - d'abord par username si connecte
+    let existingPlayer = null;
+
+    if (user) {
+      const { data } = await supabase
         .from('players')
         .select('*')
         .eq('session_id', sessionId)
-        .eq('local_id', storedPlayerId)
-        .single();
+        .eq('name', user.username)
+        .maybeSingle();
+      existingPlayer = data;
+    }
 
-      if (existingPlayer) {
-        setCurrentPlayerId(existingPlayer.local_id);
-        setSession(sess);
-        setStatus(sess.status as GameStatus);
-
-        // Charger les joueurs et questions
-        const { data: playersData } = await supabase.from('players').select('*').eq('session_id', sessionId);
-        if (playersData) {
-          setPlayers(playersData.map(p => ({
-            id: p.local_id,
-            name: p.name,
-            categories: p.categories,
-            score: p.score,
-            categoryScores: p.category_scores,
-            isManager: p.is_manager
-          })));
-        }
-
-        const { data: questionsData } = await supabase.from('questions').select('*').eq('session_id', sessionId).order('order_index', { ascending: true });
-        if (questionsData) setQuestions(questionsData as any);
-
-        setAppView(AppView.GAME);
-        return;
+    // Sinon chercher par local_id
+    if (!existingPlayer) {
+      const storedPlayerId = localStorage.getItem('mdev_player_id');
+      if (storedPlayerId) {
+        const { data } = await supabase
+          .from('players')
+          .select('*')
+          .eq('session_id', sessionId)
+          .eq('local_id', storedPlayerId)
+          .maybeSingle();
+        existingPlayer = data;
       }
+    }
+
+    if (existingPlayer) {
+      setCurrentPlayerId(existingPlayer.local_id);
+      localStorage.setItem('mdev_player_id', existingPlayer.local_id);
+      setSession(sess);
+      setStatus(sess.status as GameStatus);
+
+      // Charger les joueurs et questions
+      const { data: playersData } = await supabase.from('players').select('*').eq('session_id', sessionId);
+      if (playersData) {
+        setPlayers(playersData.map(p => ({
+          id: p.local_id,
+          name: p.name,
+          categories: p.categories,
+          score: p.score,
+          categoryScores: p.category_scores,
+          isManager: p.is_manager
+        })));
+      }
+
+      const { data: questionsData } = await supabase.from('questions').select('*').eq('session_id', sessionId).order('order_index', { ascending: true });
+      if (questionsData) setQuestions(questionsData as any);
+
+      await fetchBuzzState(sessionId);
+      setAppView(AppView.GAME);
+      return;
     }
 
     // Sinon, aller au lobby pour rejoindre
@@ -473,25 +491,27 @@ const App: React.FC = () => {
           )}
           {/* User connecte */}
           {user && (
-            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3 w-full sm:w-auto">
-              <button
-                onClick={() => setShowHistoryPanel(true)}
-                className="glass px-2 sm:px-3 py-1.5 rounded-full text-xs font-bold text-mGreen border border-mGreen/30 hover:bg-mGreen/10 transition-all"
-                title="Mes parties"
-              >
-                <i className="fas fa-history mr-1"></i>
-                <span className="hidden sm:inline">Mes parties</span>
-              </button>
-              <div className="glass px-2 sm:px-3 py-1.5 rounded-full flex items-center space-x-2 border-mYellow/30 bg-mYellow/5">
-                <i className="fas fa-user text-mYellow text-xs"></i>
-                <span className="text-[9px] sm:text-[10px] font-bold text-mYellow uppercase tracking-wider truncate max-w-[100px] sm:max-w-none">{user.username}</span>
+            <div className="flex items-center justify-between sm:justify-start gap-2 w-full sm:w-auto">
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setShowHistoryPanel(true)}
+                  className="glass px-2 py-1.5 rounded-full text-xs font-bold text-mGreen border border-mGreen/30 hover:bg-mGreen/10 transition-all"
+                  title="Mes parties"
+                >
+                  <i className="fas fa-history"></i>
+                  <span className="hidden sm:inline ml-1">Mes parties</span>
+                </button>
+                <div className="glass px-2 py-1.5 rounded-full flex items-center space-x-1 border-mYellow/30 bg-mYellow/5">
+                  <i className="fas fa-user text-mYellow text-xs"></i>
+                  <span className="text-[9px] sm:text-[10px] font-bold text-mYellow uppercase tracking-wide truncate max-w-[80px] sm:max-w-none">{user.username}</span>
+                </div>
               </div>
               <button
                 onClick={handleLogout}
-                className="text-slate-500 hover:text-mSienna text-sm sm:text-xs transition-colors"
+                className="glass px-2 py-1.5 rounded-full text-slate-500 hover:text-mSienna transition-colors border border-slate-500/20 hover:border-mSienna/30"
                 title="Deconnexion"
               >
-                <i className="fas fa-sign-out-alt"></i>
+                <i className="fas fa-sign-out-alt text-xs"></i>
               </button>
             </div>
           )}

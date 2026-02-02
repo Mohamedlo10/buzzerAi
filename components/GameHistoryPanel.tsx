@@ -5,7 +5,7 @@ import { authService, ActiveSession, GameHistory } from '../services/authService
 
 interface GameHistoryPanelProps {
   user: User;
-  onRejoinSession: (sessionId: string, sessionCode: string) => void;
+  onRejoinSession: (sessionId: string, sessionCode: string) => void | Promise<void>;
   onClose: () => void;
 }
 
@@ -14,6 +14,13 @@ const GameHistoryPanel: React.FC<GameHistoryPanelProps> = ({ user, onRejoinSessi
   const [activeSessions, setActiveSessions] = useState<ActiveSession[]>([]);
   const [gameHistory, setGameHistory] = useState<GameHistory[]>([]);
   const [loading, setLoading] = useState(true);
+  const [joiningSessionId, setJoiningSessionId] = useState<string | null>(null);
+
+  const handleRejoin = async (sessionId: string, sessionCode: string) => {
+    setJoiningSessionId(sessionId);
+    await onRejoinSession(sessionId, sessionCode);
+    onClose();
+  };
 
   useEffect(() => {
     loadData();
@@ -53,15 +60,15 @@ const GameHistoryPanel: React.FC<GameHistoryPanelProps> = ({ user, onRejoinSessi
   };
 
   return (
-    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-      <div className="glass rounded-[2rem] border-mYellow/20 w-full max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
+    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-2 sm:p-4">
+      <div className="glass rounded-[1.5rem] sm:rounded-[2rem] border-mYellow/20 w-full max-w-2xl max-h-[90vh] sm:max-h-[80vh] overflow-hidden flex flex-col">
         {/* Header */}
-        <div className="p-6 border-b border-mGreen/20 flex justify-between items-center">
+        <div className="p-4 sm:p-6 border-b border-mGreen/20 flex justify-between items-center">
           <div>
-            <h2 className="text-2xl font-orbitron text-mYellow font-bold">MES PARTIES</h2>
-            <p className="text-xs text-slate-500 uppercase tracking-widest">{user.username}</p>
+            <h2 className="text-lg sm:text-2xl font-orbitron text-mYellow font-bold">MES PARTIES</h2>
+            <p className="text-[10px] sm:text-xs text-slate-500 uppercase tracking-widest truncate max-w-[150px] sm:max-w-none">{user.username}</p>
           </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-white text-xl p-2">
+          <button onClick={onClose} className="text-slate-400 hover:text-white text-lg sm:text-xl p-2">
             <i className="fas fa-times"></i>
           </button>
         </div>
@@ -70,25 +77,25 @@ const GameHistoryPanel: React.FC<GameHistoryPanelProps> = ({ user, onRejoinSessi
         <div className="flex border-b border-mGreen/20">
           <button
             onClick={() => setActiveTab('active')}
-            className={`flex-1 py-3 text-sm font-bold uppercase tracking-widest transition-all ${
+            className={`flex-1 py-2 sm:py-3 text-[10px] sm:text-sm font-bold uppercase tracking-wider sm:tracking-widest transition-all ${
               activeTab === 'active'
                 ? 'text-mGreen border-b-2 border-mGreen bg-mGreen/5'
                 : 'text-slate-500 hover:text-slate-300'
             }`}
           >
-            <i className="fas fa-play-circle mr-2"></i>
-            En cours ({activeSessions.length})
+            <i className="fas fa-play-circle mr-1 sm:mr-2"></i>
+            <span className="hidden xs:inline">En cours</span> ({activeSessions.length})
           </button>
           <button
             onClick={() => setActiveTab('history')}
-            className={`flex-1 py-3 text-sm font-bold uppercase tracking-widest transition-all ${
+            className={`flex-1 py-2 sm:py-3 text-[10px] sm:text-sm font-bold uppercase tracking-wider sm:tracking-widest transition-all ${
               activeTab === 'history'
                 ? 'text-mOrange border-b-2 border-mOrange bg-mOrange/5'
                 : 'text-slate-500 hover:text-slate-300'
             }`}
           >
-            <i className="fas fa-history mr-2"></i>
-            Historique ({gameHistory.length})
+            <i className="fas fa-history mr-1 sm:mr-2"></i>
+            <span className="hidden xs:inline">Historique</span> ({gameHistory.length})
           </button>
         </div>
 
@@ -113,23 +120,23 @@ const GameHistoryPanel: React.FC<GameHistoryPanelProps> = ({ user, onRejoinSessi
                   return (
                     <div
                       key={session.id}
-                      className="bg-mTeal/40 p-4 rounded-xl border border-mGreen/20 flex justify-between items-center hover:bg-mTeal/50 transition-all"
+                      className="bg-mTeal/40 p-3 sm:p-4 rounded-xl border border-mGreen/20 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 hover:bg-mTeal/50 transition-all"
                     >
-                      <div className="flex-1">
-                        <div className="flex items-center gap-3">
-                          <span className="font-orbitron text-xl text-white tracking-widest">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-orbitron text-lg sm:text-xl text-white tracking-widest">
                             {session.code}
                           </span>
-                          <span className={`text-[10px] px-2 py-1 rounded-full font-bold uppercase ${status.bg} ${status.color}`}>
+                          <span className={`text-[9px] sm:text-[10px] px-2 py-0.5 rounded-full font-bold uppercase ${status.bg} ${status.color}`}>
                             {status.text}
                           </span>
                           {session.is_manager && (
-                            <span className="text-[10px] text-mYellow">
+                            <span className="text-[9px] sm:text-[10px] text-mYellow">
                               <i className="fas fa-crown mr-1"></i>Admin
                             </span>
                           )}
                         </div>
-                        <div className="text-xs text-slate-400 mt-1 flex items-center gap-4">
+                        <div className="text-[10px] sm:text-xs text-slate-400 mt-1 flex items-center gap-3">
                           <span><i className="fas fa-users mr-1"></i>{session.player_count} joueur(s)</span>
                           {session.my_score !== undefined && (
                             <span><i className="fas fa-star mr-1 text-mYellow"></i>{session.my_score} pts</span>
@@ -137,11 +144,21 @@ const GameHistoryPanel: React.FC<GameHistoryPanelProps> = ({ user, onRejoinSessi
                         </div>
                       </div>
                       <button
-                        onClick={() => { onRejoinSession(session.id, session.code); onClose(); }}
-                        className="bg-mGreen text-mTeal px-5 py-2 rounded-xl font-bold hover:bg-mGreen/90 transition-all text-sm"
+                        onClick={() => handleRejoin(session.id, session.code)}
+                        disabled={joiningSessionId !== null}
+                        className="bg-mGreen text-mTeal px-4 py-2 rounded-xl font-bold hover:bg-mGreen/90 transition-all text-sm w-full sm:w-auto disabled:opacity-70 disabled:cursor-not-allowed"
                       >
-                        <i className="fas fa-play mr-2"></i>
-                        Rejoindre
+                        {joiningSessionId === session.id ? (
+                          <>
+                            <i className="fas fa-spinner fa-spin mr-2"></i>
+                            Chargement...
+                          </>
+                        ) : (
+                          <>
+                            <i className="fas fa-play mr-2"></i>
+                            Rejoindre
+                          </>
+                        )}
                       </button>
                     </div>
                   );

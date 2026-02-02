@@ -49,7 +49,7 @@ const HomePage: React.FC<HomePageProps> = ({
       {/* Header avec user info */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h2 className="text-3xl md:text-4xl font-orbitron text-mYellow font-bold">
+          <h2 className="text-2xl md:text-xl font-orbitron text-mYellow font-bold">
             Bienvenue, {user.username}
           </h2>
           <p className="text-mGreen text-xs uppercase tracking-widest mt-1">
