@@ -27,8 +27,6 @@ enleve tout le systeme de stockage de l'identifiant local
 utilise juste maintenant le username pour savoir si le user etait dans cette session.
 lorsqu'on lance la partie on ne voit pas le loader et on nous redirige pas vers la partie a la fin 
 
-apres la generation des questions lors du lanncement de la session je ne suis pas redirige sur le game
-je suis obliger de rafraichir pour que sa marche
 
 lorsqu'on rejoins une partie en generation desqu'un user y rentre on relance la generation par l'ia pour ensuite que les questions s'affiche
 

@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { RoomState } from '../types';
 
 interface ManagerViewProps {
@@ -12,10 +12,32 @@ interface ManagerViewProps {
 const ManagerView: React.FC<ManagerViewProps> = ({ state, onValidate, onSkip, onResetBuzzer }) => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [processingAction, setProcessingAction] = useState<string | null>(null);
+  const [showStopAlert, setShowStopAlert] = useState(false);
+  const prevBuzzCountRef = useRef(state.buzzedPlayers.length);
 
   const currentQ = state.questions[state.currentQuestionIndex];
   const activeBuzzer = state.buzzedPlayers[0];
   const playerOnTurn = activeBuzzer ? state.players.find(p => p.id === activeBuzzer.playerId) : null;
+
+  // Détecter quand quelqu'un buzze pour afficher l'alerte STOP
+  useEffect(() => {
+    if (state.buzzedPlayers.length > prevBuzzCountRef.current && state.buzzedPlayers.length === 1) {
+      setShowStopAlert(true);
+      // Vibration si disponible
+      if (navigator.vibrate) {
+        navigator.vibrate([200, 100, 200]);
+      }
+    }
+    prevBuzzCountRef.current = state.buzzedPlayers.length;
+  }, [state.buzzedPlayers.length]);
+
+  // Fermer l'alerte après 3 secondes ou quand on clique
+  useEffect(() => {
+    if (showStopAlert) {
+      const timer = setTimeout(() => setShowStopAlert(false), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [showStopAlert]);
 
   const handleValidate = async (playerId: string, points: number, moveNext: boolean) => {
     setIsProcessing(true);
@@ -34,43 +56,31 @@ const ManagerView: React.FC<ManagerViewProps> = ({ state, onValidate, onSkip, on
   };
   
   return (
-    <div className="space-y-8 animate-fade-in">
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        
-        <div className="lg:col-span-2 space-y-6">
-          <div className="glass p-8 rounded-3xl border-t-4 border-mYellow shadow-2xl relative overflow-hidden">
-            <div className="absolute top-0 right-0 p-4 opacity-10 text-6xl">
-              <i className="fas fa-quote-right text-mYellow"></i>
+    <div className="space-y-4 md:space-y-8 animate-fade-in">
+      {/* Alerte STOP plein écran quand quelqu'un buzze */}
+      {showStopAlert && playerOnTurn && (
+        <div
+          className="fixed inset-0 z-50 bg-mSienna flex items-center justify-center cursor-pointer animate-pulse"
+          onClick={() => setShowStopAlert(false)}
+        >
+          <div className="text-center">
+            <div className="text-[120px] md:text-[200px] font-orbitron font-black text-white drop-shadow-2xl">
+              STOP
             </div>
-            <div className="flex justify-between items-start mb-6 relative z-10">
-              <span className="bg-mTeal text-mYellow border border-mYellow/30 px-4 py-1 rounded-full text-xs font-bold uppercase tracking-widest">
-                Question {state.currentQuestionIndex + 1} / {state.questions.length}
-              </span>
-              <span className="text-mGreen font-bold font-orbitron text-sm uppercase">RUBRIQUE: {currentQ?.category}</span>
+            <div className="text-2xl md:text-4xl font-bold text-white/90 mt-4">
+              <i className="fas fa-hand-paper mr-3"></i>
+              {playerOnTurn.name} a buzzé !
             </div>
-            
-            <h3 className="text-3xl font-bold mb-8 leading-tight text-white relative z-10">
-              {currentQ?.text}
-            </h3>
-            
-            <div className="bg-mTeal/80 p-6 rounded-2xl border border-mGreen/40 relative z-10">
-              <label className="text-[10px] text-mOrange uppercase font-black tracking-[0.2em] mb-2 block">Solution Mdev</label>
-              <p className="text-2xl font-orbitron text-mGreen font-bold">{currentQ?.answer}</p>
-            </div>
-          </div>
-
-          <div className="flex justify-center">
-             <button 
-               onClick={onSkip} 
-               className="bg-mTeal hover:bg-slate-700 text-mYellow border border-mYellow/20 px-8 py-3 rounded-xl font-bold transition-all flex items-center space-x-2"
-             >
-               <i className="fas fa-forward"></i>
-               <span>Passer cette question</span>
-             </button>
+            <p className="text-white/60 mt-4 text-sm">Appuyez pour fermer</p>
           </div>
         </div>
+      )}
 
-        <div className="glass p-6 rounded-3xl flex flex-col h-full bg-mTeal/40 border-mOrange/30">
+      {/* Sur mobile: Buzzer en premier, puis question */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-8">
+
+        {/* Panel Buzzer - En premier sur mobile */}
+        <div className="order-1 lg:order-2 glass p-4 md:p-6 rounded-3xl flex flex-col bg-mTeal/40 border-mOrange/30">
           <h4 className="text-xl font-orbitron mb-6 text-mOrange flex items-center justify-between">
             <div className="flex items-center">
               <i className="fas fa-bolt mr-3"></i>
@@ -159,7 +169,7 @@ const ManagerView: React.FC<ManagerViewProps> = ({ state, onValidate, onSkip, on
           )}
 
           {state.buzzedPlayers.length > 1 && (
-            <div className="mt-8 pt-6 border-t border-mGreen/10">
+            <div className="mt-4 md:mt-8 pt-4 md:pt-6 border-t border-mGreen/10">
               <div className="text-[10px] text-mOrange uppercase font-bold mb-3 tracking-widest">File d'attente avec delais :</div>
               <div className="space-y-2">
                 {state.buzzedPlayers.slice(1).map((b, i) => {
@@ -182,9 +192,43 @@ const ManagerView: React.FC<ManagerViewProps> = ({ state, onValidate, onSkip, on
             </div>
           )}
         </div>
+
+        {/* Panel Question - En second sur mobile */}
+        <div className="order-2 lg:order-1 lg:col-span-2 space-y-4 md:space-y-6">
+          <div className="glass p-4 md:p-8 rounded-3xl border-t-4 border-mYellow shadow-2xl relative overflow-hidden">
+            <div className="absolute top-0 right-0 p-4 opacity-10 text-4xl md:text-6xl">
+              <i className="fas fa-quote-right text-mYellow"></i>
+            </div>
+            <div className="flex flex-col sm:flex-row justify-between items-start gap-2 mb-4 md:mb-6 relative z-10">
+              <span className="bg-mTeal text-mYellow border border-mYellow/30 px-3 md:px-4 py-1 rounded-full text-[10px] md:text-xs font-bold uppercase tracking-widest">
+                Question {state.currentQuestionIndex + 1} / {state.questions.length}
+              </span>
+              <span className="text-mGreen font-bold font-orbitron text-xs md:text-sm uppercase">RUBRIQUE: {currentQ?.category}</span>
+            </div>
+
+            <h3 className="text-xl md:text-3xl font-bold mb-4 md:mb-8 leading-tight text-white relative z-10">
+              {currentQ?.text}
+            </h3>
+
+            <div className="bg-mTeal/80 p-4 md:p-6 rounded-2xl border border-mGreen/40 relative z-10">
+              <label className="text-[10px] text-mOrange uppercase font-black tracking-[0.2em] mb-2 block">Solution Mdev</label>
+              <p className="text-lg md:text-2xl font-orbitron text-mGreen font-bold">{currentQ?.answer}</p>
+            </div>
+          </div>
+
+          <div className="flex justify-center">
+             <button
+               onClick={onSkip}
+               className="bg-mTeal hover:bg-slate-700 text-mYellow border border-mYellow/20 px-6 md:px-8 py-2 md:py-3 rounded-xl font-bold transition-all flex items-center space-x-2 text-sm md:text-base"
+             >
+               <i className="fas fa-forward"></i>
+               <span>Passer cette question</span>
+             </button>
+          </div>
+        </div>
       </div>
 
-      <div className="glass p-6 rounded-3xl overflow-x-auto border-mGreen/10">
+      <div className="glass p-4 md:p-6 rounded-3xl overflow-x-auto border-mGreen/10">
          <h4 className="text-xs font-black uppercase tracking-[0.3em] text-mGreen mb-4">Mdev Live Scoreboard</h4>
          <div className="flex space-x-4">
             {state.players.map(p => (

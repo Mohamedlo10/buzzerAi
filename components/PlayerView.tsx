@@ -130,6 +130,41 @@ const PlayerView: React.FC<PlayerViewProps> = ({ state, playerId, onBuzz }) => {
           </p>
         </div>
       </div>
+
+      {/* Classement en temps réel */}
+      <div className="w-full max-w-md">
+        <div className="glass p-4 rounded-2xl border-mGreen/20">
+          <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-mGreen mb-3 text-center">
+            Classement Live
+          </h4>
+          <div className="space-y-2">
+            {[...state.players]
+              .sort((a, b) => b.score - a.score)
+              .map((p, i) => {
+                const isMe = p.id === playerId;
+                const medal = i === 0 ? 'text-yellow-400' : i === 1 ? 'text-gray-400' : i === 2 ? 'text-amber-600' : 'text-slate-500';
+                return (
+                  <div
+                    key={p.id}
+                    className={`flex items-center justify-between px-3 py-2 rounded-xl ${
+                      isMe ? 'bg-mOrange/20 border border-mOrange/50' : 'bg-mTeal/30'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className={`font-orbitron font-bold text-sm ${medal}`}>
+                        {i < 3 ? <i className={`fas fa-trophy`}></i> : `#${i + 1}`}
+                      </span>
+                      <span className={`font-bold text-sm ${isMe ? 'text-mOrange' : 'text-slate-300'}`}>
+                        {p.name} {isMe && '(vous)'}
+                      </span>
+                    </div>
+                    <span className="font-orbitron font-bold text-mYellow">{p.score}</span>
+                  </div>
+                );
+              })}
+          </div>
+        </div>
+      </div>
     </div>
   );
 };
