@@ -1,6 +1,3 @@
-pouvoir choisir le niveau de difficulte
-pouvoir ajouter beaucoup de rubrique
-optimisation en utilisant des fonctions rpc
 pouvoir rejoindre une session pas encore demarrer
 ajouter ke son
 eviter le scrolling pour l'admin sur le telephone
