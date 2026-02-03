@@ -15,7 +15,8 @@ const HomePage: React.FC = () => {
       return;
     }
     loadSessions();
-  }, [user?.id, navigate]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]); // navigate est stable, pas besoin de le mettre en dépendance
 
   const loadSessions = async () => {
     if (!user) return;

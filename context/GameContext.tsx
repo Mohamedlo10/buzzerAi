@@ -86,44 +86,54 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
   const [currentPlayerId, setCurrentPlayerId] = useState<string | null>(localStorage.getItem('mdev_player_id'));
   const [status, setStatus] = useState<GameStatus>(GameStatus.LOBBY);
 
-  // Fetch buzz state
+  // Ref pour éviter les re-créations de callback
+  const sessionIdRef = React.useRef<string | null>(null);
+
+  // Mettre à jour la ref quand session.id change
+  useEffect(() => {
+    sessionIdRef.current = session?.id || null;
+  }, [session?.id]);
+
+  // Fetch buzz state - stable callback sans dépendance sur session
   const fetchBuzzState = useCallback(async (sessionId?: string) => {
-    const sid = sessionId || session?.id;
+    const sid = sessionId || sessionIdRef.current;
     if (!sid) return;
 
     const buzzes = await buzzService.getBuzzesBySession(sid);
     setBuzzedPlayers(buzzes);
-  }, [session?.id]);
+  }, []);
 
   // Polling for buzzer state
   useEffect(() => {
     if (!session?.id || status !== GameStatus.PLAYING) return;
 
-    const pollInterval = setInterval(fetchBuzzState, 1000);
+    const currentSessionId = session.id;
+    const pollInterval = setInterval(() => fetchBuzzState(currentSessionId), 1000);
     return () => clearInterval(pollInterval);
   }, [session?.id, status, fetchBuzzState]);
 
-  // Real-time subscriptions
+  // Real-time subscriptions - dépend UNIQUEMENT de session.id
   useEffect(() => {
-    if (!session?.id) return;
+    const currentSessionId = session?.id;
+    if (!currentSessionId) return;
 
-    const sessionSub = realtimeService.subscribeToSession(session.id, (payload) => {
+    const sessionSub = realtimeService.subscribeToSession(currentSessionId, (payload) => {
       const updated = payload.new as Session;
       setSession(updated);
       setStatus(updated.status as GameStatus);
     });
 
-    const playersSub = realtimeService.subscribeToPlayers(session.id, async () => {
-      const playersData = await playerService.getPlayersBySession(session.id);
+    const playersSub = realtimeService.subscribeToPlayers(currentSessionId, async () => {
+      const playersData = await playerService.getPlayersBySession(currentSessionId);
       setPlayers(playersData);
     });
 
-    const buzzSub = realtimeService.subscribeToBuzzes(session.id, async () => {
-      await fetchBuzzState();
+    const buzzSub = realtimeService.subscribeToBuzzes(currentSessionId, async () => {
+      await fetchBuzzState(currentSessionId);
     });
 
-    const questionsSub = realtimeService.subscribeToQuestions(session.id, async () => {
-      const questionsData = await questionService.getQuestionsBySession(session.id);
+    const questionsSub = realtimeService.subscribeToQuestions(currentSessionId, async () => {
+      const questionsData = await questionService.getQuestionsBySession(currentSessionId);
       setQuestions(questionsData);
     });
 
@@ -133,7 +143,7 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
       realtimeService.unsubscribe(buzzSub);
       realtimeService.unsubscribe(questionsSub);
     };
-  }, [session?.id, fetchBuzzState]);
+  }, [session?.id]); // Dépendance UNIQUEMENT sur session?.id, pas sur fetchBuzzState
 
   const setupGame = async (allPlayers: Player[], debt: number, questionsPerCategory: number) => {
     if (!session) return;

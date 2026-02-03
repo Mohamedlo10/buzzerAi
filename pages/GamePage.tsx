@@ -21,9 +21,13 @@ const GamePage: React.FC = () => {
     rejoinSession
   } = useGame();
 
+  // Flag pour éviter les appels multiples de rejoin
+  const [hasTriedRejoin, setHasTriedRejoin] = React.useState(false);
+
   useEffect(() => {
-    // If no session, try to rejoin
-    if (!session && sessionId) {
+    // If no session, try to rejoin (une seule fois)
+    if (!session && sessionId && !hasTriedRejoin) {
+      setHasTriedRejoin(true);
       const tryRejoin = async () => {
         const result = await rejoinSession(sessionId, '');
         if (!result.success) {
@@ -34,14 +38,16 @@ const GamePage: React.FC = () => {
       };
       tryRejoin();
     }
-  }, [session, sessionId, navigate, rejoinSession]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionId, hasTriedRejoin]); // Dépendances minimales
 
   useEffect(() => {
     // Redirect to results if game is over
     if (status === GameStatus.RESULTS && session?.id) {
       navigate(`/results/${session.id}`);
     }
-  }, [status, session?.id, navigate]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status, session?.id]); // navigate est stable
 
   // Loading state
   if (!session || !currentPlayerId) {
