@@ -21,3 +21,8 @@ pouvoir changer de rubrique
 enlever l'identifiant
 faire une distinction de classement avec les dettes de points
 rectifier en cas d'erreur de l'admin lors de l'attribution des points
+
+
+enleve tout le systeme de stockage de l'identifiant local
+utilise juste maintenant le username pour savoir si le user etait dans cette session.
+lorsqu'on lance la partie on ne voit pas le loader et on nous redirige pas vers la partie a la fin 

@@ -4,12 +4,13 @@ import { RealtimeChannel } from '@supabase/supabase-js';
 export type RealtimeCallback = (payload: any) => void;
 
 export const realtimeService = {
+  // Noms de channels uniques avec sessionId pour éviter les conflits
   subscribeToSession(sessionId: string, onUpdate: RealtimeCallback): RealtimeChannel {
     return supabase
-      .channel('session_changes')
+      .channel(`session_changes_${sessionId}`)
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'sessions', filter: `id=eq.${sessionId}` },
+        { event: 'UPDATE', schema: 'public', table: 'sessions', filter: `id=eq.${sessionId}` },
         onUpdate
       )
       .subscribe();
@@ -17,7 +18,7 @@ export const realtimeService = {
 
   subscribeToPlayers(sessionId: string, onUpdate: RealtimeCallback): RealtimeChannel {
     return supabase
-      .channel('players_changes')
+      .channel(`players_changes_${sessionId}`)
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'players', filter: `session_id=eq.${sessionId}` },
@@ -28,7 +29,7 @@ export const realtimeService = {
 
   subscribeToBuzzes(sessionId: string, onUpdate: RealtimeCallback): RealtimeChannel {
     return supabase
-      .channel('buzz_changes')
+      .channel(`buzz_changes_${sessionId}`)
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'buzzes', filter: `session_id=eq.${sessionId}` },
@@ -39,7 +40,7 @@ export const realtimeService = {
 
   subscribeToQuestions(sessionId: string, onUpdate: RealtimeCallback): RealtimeChannel {
     return supabase
-      .channel('questions_changes')
+      .channel(`questions_changes_${sessionId}`)
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'questions', filter: `session_id=eq.${sessionId}` },
@@ -48,10 +49,10 @@ export const realtimeService = {
       .subscribe();
   },
 
-  // Pour le lobby - subscriptions spécifiques
+  // Pour le lobby - subscriptions spécifiques avec noms uniques
   subscribeToLobbyPlayers(sessionId: string, onUpdate: RealtimeCallback): RealtimeChannel {
     return supabase
-      .channel('lobby_players')
+      .channel(`lobby_players_${sessionId}`)
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'players', filter: `session_id=eq.${sessionId}` },
@@ -62,7 +63,7 @@ export const realtimeService = {
 
   subscribeToLobbySession(sessionId: string, onUpdate: RealtimeCallback): RealtimeChannel {
     return supabase
-      .channel('lobby_session')
+      .channel(`lobby_session_${sessionId}`)
       .on(
         'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'sessions', filter: `id=eq.${sessionId}` },

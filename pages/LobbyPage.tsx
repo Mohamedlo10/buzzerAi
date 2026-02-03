@@ -72,37 +72,52 @@ const LobbyPage: React.FC = () => {
     }
   }, [code]);
 
+  // Refs pour accéder aux valeurs actuelles dans les callbacks sans re-créer les subscriptions
+  const currentPlayerRef = React.useRef(currentPlayer);
+  const localPlayersRef = React.useRef(localPlayers);
+
   useEffect(() => {
-    if (!localSession?.id) return;
+    currentPlayerRef.current = currentPlayer;
+  }, [currentPlayer]);
+
+  useEffect(() => {
+    localPlayersRef.current = localPlayers;
+  }, [localPlayers]);
+
+  useEffect(() => {
+    const sessionId = localSession?.id;
+    if (!sessionId) return;
 
     const loadPlayers = async () => {
-      const playersData = await playerService.getPlayersBySession(localSession.id);
+      const playersData = await playerService.getPlayersBySession(sessionId);
       setLocalPlayers(playersData);
     };
     loadPlayers();
 
-    const playersSub = realtimeService.subscribeToLobbyPlayers(localSession.id, async () => {
-      const playersData = await playerService.getPlayersBySession(localSession.id);
+    const playersSub = realtimeService.subscribeToLobbyPlayers(sessionId, async () => {
+      const playersData = await playerService.getPlayersBySession(sessionId);
       setLocalPlayers(playersData);
     });
 
-    const sessionSub = realtimeService.subscribeToLobbySession(localSession.id, async (payload) => {
+    const sessionSub = realtimeService.subscribeToLobbySession(sessionId, async (payload) => {
       const updated = payload.new as any;
-      if (updated.status !== 'LOBBY' && currentPlayer) {
+      const currentPlayerValue = currentPlayerRef.current;
+
+      if (updated.status !== 'LOBBY' && currentPlayerValue) {
         // Session started, navigate to game
         setSession(updated);
         setStatus(updated.status as GameStatus);
-        setPlayers(localPlayers);
-        setCurrentPlayerId(currentPlayer.id);
+        setPlayers(localPlayersRef.current);
+        setCurrentPlayerId(currentPlayerValue.id);
 
         // Load questions if playing
         if (updated.status === GameStatus.PLAYING || updated.status === GameStatus.GENERATING) {
-          const questionsData = await questionService.getQuestionsBySession(localSession.id);
+          const questionsData = await questionService.getQuestionsBySession(sessionId);
           setQuestions(questionsData);
-          await fetchBuzzState(localSession.id);
+          await fetchBuzzState(sessionId);
         }
 
-        navigate(`/game/${localSession.id}`);
+        navigate(`/game/${sessionId}`);
       }
     });
 
@@ -110,7 +125,8 @@ const LobbyPage: React.FC = () => {
       realtimeService.unsubscribe(playersSub);
       realtimeService.unsubscribe(sessionSub);
     };
-  }, [localSession?.id, currentPlayer, navigate, setSession, setStatus, setPlayers, setCurrentPlayerId, setQuestions, fetchBuzzState, localPlayers]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [localSession?.id]); // Dépendance uniquement sur l'ID de session
 
   const handleCreateRoom = async () => {
     if (!managerName.trim()) return alert("Nom requis");

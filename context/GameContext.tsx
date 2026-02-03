@@ -103,7 +103,7 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
     setBuzzedPlayers(buzzes);
   }, []);
 
-  // Polling for buzzer state
+  // Polling for buzzer state - seulement pendant PLAYING
   useEffect(() => {
     if (!session?.id || status !== GameStatus.PLAYING) return;
 
@@ -112,38 +112,46 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
     return () => clearInterval(pollInterval);
   }, [session?.id, status, fetchBuzzState]);
 
-  // Real-time subscriptions - dépend UNIQUEMENT de session.id
+  // Real-time subscriptions - seulement quand PLAYING ou RESULTS
   useEffect(() => {
     const currentSessionId = session?.id;
-    if (!currentSessionId) return;
+    // Ne pas créer de subscriptions pendant LOBBY ou GENERATING
+    if (!currentSessionId || status === GameStatus.GENERATING || status === GameStatus.LOBBY) return;
+
+    let isSubscribed = true; // Flag pour éviter les updates après unsubscribe
 
     const sessionSub = realtimeService.subscribeToSession(currentSessionId, (payload) => {
+      if (!isSubscribed) return;
       const updated = payload.new as Session;
       setSession(updated);
       setStatus(updated.status as GameStatus);
     });
 
     const playersSub = realtimeService.subscribeToPlayers(currentSessionId, async () => {
+      if (!isSubscribed) return;
       const playersData = await playerService.getPlayersBySession(currentSessionId);
-      setPlayers(playersData);
+      if (isSubscribed) setPlayers(playersData);
     });
 
     const buzzSub = realtimeService.subscribeToBuzzes(currentSessionId, async () => {
+      if (!isSubscribed) return;
       await fetchBuzzState(currentSessionId);
     });
 
     const questionsSub = realtimeService.subscribeToQuestions(currentSessionId, async () => {
+      if (!isSubscribed) return;
       const questionsData = await questionService.getQuestionsBySession(currentSessionId);
-      setQuestions(questionsData);
+      if (isSubscribed) setQuestions(questionsData);
     });
 
     return () => {
+      isSubscribed = false;
       realtimeService.unsubscribe(sessionSub);
       realtimeService.unsubscribe(playersSub);
       realtimeService.unsubscribe(buzzSub);
       realtimeService.unsubscribe(questionsSub);
     };
-  }, [session?.id]); // Dépendance UNIQUEMENT sur session?.id, pas sur fetchBuzzState
+  }, [session?.id, status]); // Dépend aussi de status pour recréer après GENERATING
 
   const setupGame = async (allPlayers: Player[], debt: number, questionsPerCategory: number) => {
     if (!session) return;
