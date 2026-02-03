@@ -5,23 +5,24 @@ import { sessionService } from '../services/sessionService';
 import { playerService } from '../services/playerService';
 import { realtimeService } from '../services/realtimeService';
 
+type LobbyView = 'CHOICE' | 'CREATE' | 'JOIN' | 'WAITING';
+
 interface LobbyProps {
   onStart: (players: Player[], debt: number, qPerUser: number) => void;
   onJoin: (player: Player, session: any) => void;
   user?: User | null;
   onBack?: () => void;
+  initialView: LobbyView;
 }
 
-const Lobby: React.FC<LobbyProps> = ({ onStart, onJoin, user, onBack }) => {
-  const [view, setView] = useState<'CHOICE' | 'CREATE' | 'JOIN' | 'WAITING'>('CHOICE');
+const Lobby: React.FC<LobbyProps> = ({ onStart, onJoin, user, onBack, initialView }) => {
+  const [view, setView] = useState<LobbyView>(initialView);
   const [session, setSession] = useState<any>(null);
   const [players, setPlayers] = useState<Player[]>([]);
-  // Si connecte, utiliser automatiquement le username du compte
   const [managerName, setManagerName] = useState(user?.username || '');
   const [currentPlayer, setCurrentPlayer] = useState<Player | null>(null);
 
   const [inputSessionCode, setInputSessionCode] = useState('');
-  // Si connecte, le username est fixe
   const [newPlayerName, setNewPlayerName] = useState(user?.username || '');
   const isUsernameFixed = !!user;
   const [tempCategories, setTempCategories] = useState<PlayerCategory[]>([]);
@@ -37,7 +38,6 @@ const Lobby: React.FC<LobbyProps> = ({ onStart, onJoin, user, onBack }) => {
     localStorage.setItem('mdev_player_id', myLocalId);
   }, [myLocalId]);
 
-  // Synchroniser le username quand l'utilisateur change
   useEffect(() => {
     if (user?.username) {
       setManagerName(user.username);
@@ -45,11 +45,9 @@ const Lobby: React.FC<LobbyProps> = ({ onStart, onJoin, user, onBack }) => {
     }
   }, [user?.username]);
 
-  // Subscription aux joueurs
   useEffect(() => {
     if (!session?.id) return;
 
-    // Charger les joueurs initiaux
     const loadPlayers = async () => {
       const playersData = await playerService.getPlayersBySession(session.id);
       setPlayers(playersData);
@@ -61,11 +59,9 @@ const Lobby: React.FC<LobbyProps> = ({ onStart, onJoin, user, onBack }) => {
       setPlayers(playersData);
     });
 
-    // Subscription aux changements de session (pour detecter le lancement du jeu)
     const sessionSub = realtimeService.subscribeToLobbySession(session.id, (payload) => {
       const updated = payload.new as any;
       if (updated.status !== 'LOBBY' && currentPlayer) {
-        // Le jeu a ete lance, rediriger vers le jeu
         onJoin(currentPlayer, updated);
       }
     });
@@ -116,9 +112,7 @@ const Lobby: React.FC<LobbyProps> = ({ onStart, onJoin, user, onBack }) => {
         return alert("Session introuvable");
       }
 
-      // Si la session n'est pas en LOBBY, rediriger directement vers le jeu
       if (sess.status !== 'LOBBY') {
-        // Verifier si le joueur existe deja
         const existingByName = await playerService.getPlayerByName(sess.id, newPlayerName.trim());
 
         if (existingByName) {
@@ -142,7 +136,6 @@ const Lobby: React.FC<LobbyProps> = ({ onStart, onJoin, user, onBack }) => {
         return alert("La partie est deja en cours et vous n'etes pas inscrit");
       }
 
-      // 1. Verifier si le joueur existe deja par local_id
       const existingByLocalId = await playerService.getPlayerByLocalId(sess.id, myLocalId);
 
       if (existingByLocalId) {
@@ -156,7 +149,6 @@ const Lobby: React.FC<LobbyProps> = ({ onStart, onJoin, user, onBack }) => {
         };
         setIsJoining(false);
 
-        // Si c'est l'admin, rediriger directement vers la vue admin
         if (existingByLocalId.is_manager) {
           setSession(sess);
           setCurrentPlayer(p);
@@ -169,7 +161,6 @@ const Lobby: React.FC<LobbyProps> = ({ onStart, onJoin, user, onBack }) => {
         return;
       }
 
-      // 2. Verifier si un joueur avec le meme username existe
       const existingByName = await playerService.getPlayerByName(sess.id, newPlayerName.trim());
 
       if (existingByName) {
@@ -187,7 +178,6 @@ const Lobby: React.FC<LobbyProps> = ({ onStart, onJoin, user, onBack }) => {
         localStorage.setItem('mdev_player_id', myLocalId);
         setIsJoining(false);
 
-        // Si c'est l'admin, rediriger directement vers la vue admin
         if (existingByName.is_manager) {
           setSession(sess);
           setCurrentPlayer(p);
@@ -200,7 +190,6 @@ const Lobby: React.FC<LobbyProps> = ({ onStart, onJoin, user, onBack }) => {
         return;
       }
 
-      // 3. Nouveau joueur - les categories sont optionnelles maintenant
       const p: Player = {
         id: myLocalId,
         name: newPlayerName,
@@ -233,41 +222,16 @@ const Lobby: React.FC<LobbyProps> = ({ onStart, onJoin, user, onBack }) => {
     setTempCategories(tempCategories.filter((_, i) => i !== index));
   };
 
-  // Vue de choix initial
-  if (view === 'CHOICE') {
-    return (
-      <div className="flex flex-col items-center justify-center space-y-12 animate-fade-in py-12">
-        <div className="text-center">
-          <h2 className="text-xl sm:text-2xl md:text-4xl lg:text-5xl font-orbitron text-mYellow font-bold mb-4 text-center">MDEV CLOUD BUZZ</h2>
-          <p className="text-mGreen font-orbitron text-xs tracking-[0.2em] sm:tracking-[0.4em] uppercase opacity-80 text-center">Sync via Supabase Realtime</p>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8 w-full max-w-4xl">
-          <button onClick={() => setView('CREATE')} className="glass p-8 sm:p-12 rounded-[2rem] sm:rounded-[3rem] border-mGreen/30 hover:border-mGreen transition-all group flex flex-col items-center space-y-4 sm:space-y-6 shadow-2xl">
-            <div className="bg-mGreen/20 p-4 sm:p-6 rounded-full group-hover:scale-110 transition-transform"><i className="fas fa-server text-3xl sm:text-5xl text-mGreen"></i></div>
-            <span className="font-orbitron font-black text-lg sm:text-xl text-mGreen block uppercase tracking-widest text-center">ADMIN SALLE</span>
-            <span className="text-xs text-slate-500 text-center px-2">Creer et gerer une partie</span>
-          </button>
-          <button onClick={() => setView('JOIN')} className="glass p-8 sm:p-12 rounded-[2rem] sm:rounded-[3rem] border-mOrange/30 hover:border-mOrange transition-all group flex flex-col items-center space-y-4 sm:space-y-6 shadow-2xl">
-            <div className="bg-mOrange/20 p-4 sm:p-6 rounded-full group-hover:scale-110 transition-transform"><i className="fas fa-network-wired text-3xl sm:text-5xl text-mOrange"></i></div>
-            <span className="font-orbitron font-black text-lg sm:text-xl text-mOrange block uppercase tracking-widest text-center">REJOINDRE</span>
-            <span className="text-xs text-slate-500 text-center px-2">Entrer dans une partie existante</span>
-          </button>
-        </div>
-        {onBack && (
-          <button onClick={onBack} className="text-slate-500 uppercase font-bold text-sm tracking-widest hover:text-mYellow transition-colors">
-            <i className="fas fa-arrow-left mr-2"></i>
-            Retour
-          </button>
-        )}
-      </div>
-    );
-  }
+  const handleBack = () => {
+    if (onBack) {
+      onBack();
+    }
+  };
 
   // Vue d'attente pour les joueurs qui ont rejoint
   if (view === 'WAITING' && session && currentPlayer) {
     return (
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 animate-fade-in">
-        {/* Info joueur */}
         <div className="glass p-8 md:p-10 rounded-[2.5rem] border-mYellow/20 flex flex-col shadow-2xl">
           <div className="text-center space-y-6">
             <div className="bg-mGreen/20 w-24 h-24 rounded-full mx-auto flex items-center justify-center">
@@ -299,7 +263,6 @@ const Lobby: React.FC<LobbyProps> = ({ onStart, onJoin, user, onBack }) => {
           </div>
         </div>
 
-        {/* Liste des joueurs */}
         <div className="glass p-8 md:p-10 rounded-[2.5rem] border-mGreen/20 shadow-2xl flex flex-col">
           <h2 className="text-lg md:text-xl font-orbitron mb-6 text-mGreen font-black">
             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
@@ -334,6 +297,54 @@ const Lobby: React.FC<LobbyProps> = ({ onStart, onJoin, user, onBack }) => {
                 <p className="italic">Chargement...</p>
               </div>
             )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Vue de choix pour les guests
+  if (view === 'CHOICE') {
+    return (
+      <div className="max-w-2xl mx-auto animate-fade-in">
+        <div className="glass p-8 md:p-12 rounded-[2.5rem] border-mYellow/20 shadow-2xl">
+          <div className="text-center mb-10">
+            <h1 className="text-3xl md:text-4xl font-orbitron text-mYellow font-black uppercase tracking-wider">
+              BuzzMaster
+            </h1>
+            <p className="text-slate-400 mt-2 text-sm">Mode Invité</p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <button
+              onClick={() => setView('CREATE')}
+              className="glass p-8 rounded-[2rem] border-mGreen/30 hover:border-mGreen hover:bg-mGreen/5 transition-all group flex flex-col items-center space-y-4"
+            >
+              <div className="bg-mGreen/20 p-5 rounded-full group-hover:scale-110 transition-transform">
+                <i className="fas fa-plus text-4xl text-mGreen"></i>
+              </div>
+              <span className="font-orbitron font-black text-lg text-mGreen uppercase tracking-widest">
+                Nouvelle Session
+              </span>
+              <span className="text-xs text-slate-500">
+                Créez une partie et invitez des joueurs
+              </span>
+            </button>
+
+            <button
+              onClick={() => setView('JOIN')}
+              className="glass p-8 rounded-[2rem] border-mOrange/30 hover:border-mOrange hover:bg-mOrange/5 transition-all group flex flex-col items-center space-y-4"
+            >
+              <div className="bg-mOrange/20 p-5 rounded-full group-hover:scale-110 transition-transform">
+                <i className="fas fa-link text-4xl text-mOrange"></i>
+              </div>
+              <span className="font-orbitron font-black text-lg text-mOrange uppercase tracking-widest">
+                Rejoindre
+              </span>
+              <span className="text-xs text-slate-500">
+                Entrez un code pour rejoindre une partie
+              </span>
+            </button>
           </div>
         </div>
       </div>
@@ -393,7 +404,10 @@ const Lobby: React.FC<LobbyProps> = ({ onStart, onJoin, user, onBack }) => {
                 </p>
               </div>
             )}
-            <button onClick={() => { setView('CHOICE'); setSession(null); }} className="w-full text-slate-500 uppercase font-bold text-[10px] tracking-widest hover:text-mYellow transition-colors">
+            <button
+              onClick={() => onBack ? handleBack() : setView('CHOICE')}
+              className="w-full text-slate-500 uppercase font-bold text-[10px] tracking-widest hover:text-mYellow transition-colors"
+            >
               <i className="fas fa-arrow-left mr-1"></i> Retour
             </button>
           </div>
@@ -513,14 +527,17 @@ const Lobby: React.FC<LobbyProps> = ({ onStart, onJoin, user, onBack }) => {
                 )}
               </button>
             </div>
-            <button onClick={() => setView('CHOICE')} className="w-full text-slate-500 uppercase font-bold text-[10px] tracking-widest hover:text-mYellow transition-colors">
+            <button
+              onClick={() => onBack ? handleBack() : setView('CHOICE')}
+              className="w-full text-slate-500 uppercase font-bold text-[10px] tracking-widest hover:text-mYellow transition-colors"
+            >
               <i className="fas fa-arrow-left mr-1"></i> Retour
             </button>
           </div>
         )}
       </div>
 
-      {/* Liste des joueurs (visible seulement quand session existe pour admin) */}
+      {/* Liste des joueurs */}
       <div className="glass p-8 md:p-10 rounded-[2.5rem] border-mGreen/20 shadow-2xl flex flex-col">
         <h2 className="text-lg md:text-xl font-orbitron mb-6 text-mGreen font-black">
           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">

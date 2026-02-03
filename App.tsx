@@ -32,6 +32,7 @@ const App: React.FC = () => {
   const [buzzedPlayers, setBuzzedPlayers] = useState<Buzz[]>([]);
   const [currentPlayerId, setCurrentPlayerId] = useState<string | null>(localStorage.getItem('mdev_player_id'));
   const [status, setStatus] = useState<GameStatus>(GameStatus.LOBBY);
+  const [lobbyInitialView, setLobbyInitialView] = useState<'CHOICE' | 'CREATE' | 'JOIN'>('CREATE');
 
   // Fonction pour recuperer l'etat des buzzes - utilise RPC via buzzService
   const fetchBuzzState = async (sessionId?: string) => {
@@ -267,6 +268,7 @@ const App: React.FC = () => {
 
   // Handler skip auth (guest)
   const handleSkipAuth = () => {
+    setLobbyInitialView('CHOICE');
     setAppView(AppView.LOBBY);
   };
 
@@ -280,6 +282,7 @@ const App: React.FC = () => {
     if (user) {
       setAppView(AppView.HOME);
     } else {
+      setLobbyInitialView('CHOICE');
       setAppView(AppView.LOBBY);
     }
   };
@@ -294,6 +297,10 @@ const App: React.FC = () => {
           onCreateSession={() => setAppView(AppView.LOBBY)}
           onJoinSession={() => setAppView(AppView.LOBBY)}
           onRejoinSession={handleRejoinSession}
+          onNavigateToLobby={(view) => {
+            setLobbyInitialView(view);
+            setAppView(AppView.LOBBY);
+          }}
         />
       );
     }
@@ -304,6 +311,7 @@ const App: React.FC = () => {
         <Lobby
           user={user}
           onStart={setupGame}
+          initialView={lobbyInitialView}
           onJoin={async (p, sess) => {
             setCurrentPlayerId(p.id);
             localStorage.setItem('mdev_player_id', p.id);
@@ -323,7 +331,9 @@ const App: React.FC = () => {
 
             setAppView(AppView.GAME);
           }}
-          onBack={user ? () => setAppView(AppView.HOME) : undefined}
+          onBack={user ? () => {
+            setAppView(AppView.HOME);
+          } : undefined}
         />
       );
     }

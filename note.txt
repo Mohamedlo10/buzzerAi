@@ -1,3 +1,26 @@
 pouvoir choisir le niveau de difficulte
 pouvoir ajouter beaucoup de rubrique
 optimisation en utilisant des fonctions rpc
+pouvoir rejoindre une session pas encore demarrer
+ajouter ke son
+eviter le scrolling pour l'admin sur le telephone
+desque quelqu'un buzz on masque la question
+compteur
+classement en temps reel
+reconnectiona refaire
+classement generale de la plateform
+enlever le formatage du minuscule
+mode amie
+pouvoir cliquez sur les users pour voir clairement leur rubrique
+loader d'une personne qui marche
+choisir avatar
+pouvoir explicite la reponse en cas de litige
+
+varier les questions parfois avec l'historique
+creation de salles possibles
+admin qui controle le nombre de rubrique
+faire qu l'ajout de la rubrique 
+pouvoir changer de rubrique
+enlever l'identifiant
+faire une distinction de classement avec les dettes de points
+rectifier en cas d'erreur de l'admin lors de l'attribution des points

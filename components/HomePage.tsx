@@ -8,6 +8,7 @@ interface HomePageProps {
   onCreateSession: () => void;
   onJoinSession: () => void;
   onRejoinSession: (sessionId: string, sessionCode: string) => void;
+  onNavigateToLobby?: (initialView: 'CREATE' | 'JOIN') => void;
 }
 
 const HomePage: React.FC<HomePageProps> = ({
@@ -15,7 +16,8 @@ const HomePage: React.FC<HomePageProps> = ({
   onLogout,
   onCreateSession,
   onJoinSession,
-  onRejoinSession
+  onRejoinSession,
+  onNavigateToLobby
 }) => {
   const [activeSessions, setActiveSessions] = useState<ActiveSession[]>([]);
   const [loading, setLoading] = useState(true);
@@ -69,7 +71,7 @@ const HomePage: React.FC<HomePageProps> = ({
       {/* Action Buttons */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <button
-          onClick={onCreateSession}
+          onClick={() => onNavigateToLobby ? onNavigateToLobby('CREATE') : onCreateSession()}
           className="glass p-8 rounded-[2rem] border-mGreen/30 hover:border-mGreen hover:bg-mGreen/5 transition-all group flex flex-col items-center space-y-4 shadow-xl"
         >
           <div className="bg-mGreen/20 p-5 rounded-full group-hover:scale-110 transition-transform">
@@ -84,7 +86,7 @@ const HomePage: React.FC<HomePageProps> = ({
         </button>
 
         <button
-          onClick={onJoinSession}
+          onClick={() => onNavigateToLobby ? onNavigateToLobby('JOIN') : onJoinSession()}
           className="glass p-8 rounded-[2rem] border-mOrange/30 hover:border-mOrange hover:bg-mOrange/5 transition-all group flex flex-col items-center space-y-4 shadow-xl"
         >
           <div className="bg-mOrange/20 p-5 rounded-full group-hover:scale-110 transition-transform">
