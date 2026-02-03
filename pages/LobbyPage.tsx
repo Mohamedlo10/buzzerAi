@@ -84,6 +84,30 @@ const LobbyPage: React.FC = () => {
     localPlayersRef.current = localPlayers;
   }, [localPlayers]);
 
+  // Fonction pour gérer la navigation vers le jeu quand la session change de statut
+  const handleSessionStatusChange = async (sessionId: string, updatedSession: any) => {
+    const currentPlayerValue = currentPlayerRef.current;
+
+    if (updatedSession.status !== 'LOBBY' && currentPlayerValue) {
+      // Session started, navigate to game
+      setSession(updatedSession);
+      setStatus(updatedSession.status as GameStatus);
+      setPlayers(localPlayersRef.current);
+      setCurrentPlayerId(currentPlayerValue.id);
+
+      // Load questions if playing
+      if (updatedSession.status === GameStatus.PLAYING) {
+        const questionsData = await questionService.getQuestionsBySession(sessionId);
+        setQuestions(questionsData);
+        await fetchBuzzState(sessionId);
+      }
+
+      navigate(`/game/${sessionId}`);
+      return true;
+    }
+    return false;
+  };
+
   useEffect(() => {
     const sessionId = localSession?.id;
     if (!sessionId) return;
@@ -101,24 +125,7 @@ const LobbyPage: React.FC = () => {
 
     const sessionSub = realtimeService.subscribeToLobbySession(sessionId, async (payload) => {
       const updated = payload.new as any;
-      const currentPlayerValue = currentPlayerRef.current;
-
-      if (updated.status !== 'LOBBY' && currentPlayerValue) {
-        // Session started, navigate to game
-        setSession(updated);
-        setStatus(updated.status as GameStatus);
-        setPlayers(localPlayersRef.current);
-        setCurrentPlayerId(currentPlayerValue.id);
-
-        // Load questions if playing
-        if (updated.status === GameStatus.PLAYING || updated.status === GameStatus.GENERATING) {
-          const questionsData = await questionService.getQuestionsBySession(sessionId);
-          setQuestions(questionsData);
-          await fetchBuzzState(sessionId);
-        }
-
-        navigate(`/game/${sessionId}`);
-      }
+      await handleSessionStatusChange(sessionId, updated);
     });
 
     return () => {
@@ -127,6 +134,28 @@ const LobbyPage: React.FC = () => {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [localSession?.id]); // Dépendance uniquement sur l'ID de session
+
+  // Polling rapide pour détecter le changement de statut de la session
+  useEffect(() => {
+    const sessionId = localSession?.id;
+    if (!sessionId) return;
+
+    let isNavigating = false;
+
+    const pollInterval = setInterval(async () => {
+      if (isNavigating) return;
+
+      const updatedSession = await sessionService.getSessionById(sessionId);
+      if (updatedSession && updatedSession.status !== 'LOBBY') {
+        isNavigating = true;
+        clearInterval(pollInterval);
+        await handleSessionStatusChange(sessionId, updatedSession);
+      }
+    }, 300); // Vérifie toutes les 300ms pour une détection rapide
+
+    return () => clearInterval(pollInterval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [localSession?.id]);
 
   const handleCreateRoom = async () => {
     if (!managerName.trim()) return alert("Nom requis");
@@ -294,14 +323,23 @@ const LobbyPage: React.FC = () => {
     try {
       setSession(localSession);
       setPlayers(localPlayers);
+      setCurrentPlayerId(myLocalId);
 
       setStartingStep('Génération des questions avec l\'IA...');
       await setupGame(localPlayers, debt, qPerUser);
 
       setStartingStep('Lancement de la partie...');
+
+      // Le manager doit naviguer explicitement après setupGame
+      // car il ne recevra pas forcément la notification realtime de son propre changement
+      const questionsData = await questionService.getQuestionsBySession(localSession.id);
+      setQuestions(questionsData);
+      setStatus(GameStatus.PLAYING);
+      await fetchBuzzState(localSession.id);
+
+      navigate(`/game/${localSession.id}`);
     } catch (error) {
       console.error('Erreur:', error);
-    } finally {
       setIsStartingGame(false);
       setStartingStep('');
     }

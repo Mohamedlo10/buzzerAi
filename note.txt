@@ -21,8 +21,50 @@ pouvoir changer de rubrique
 enlever l'identifiant
 faire une distinction de classement avec les dettes de points
 rectifier en cas d'erreur de l'admin lors de l'attribution des points
-
-
+lorsqu'on clic pour lancer generer une session afficher un loader
+si on est admin de la session pouvoir changer le statut a tout moment cliquer dessus pour le demarrer l'arreter ou ajouter des gens
 enleve tout le systeme de stockage de l'identifiant local
 utilise juste maintenant le username pour savoir si le user etait dans cette session.
 lorsqu'on lance la partie on ne voit pas le loader et on nous redirige pas vers la partie a la fin 
+
+apres la generation des questions lors du lanncement de la session je ne suis pas redirige sur le game
+je suis obliger de rafraichir pour que sa marche
+
+lorsqu'on rejoins une partie en generation desqu'un user y rentre on relance la generation par l'ia pour ensuite que les questions s'affiche
+
+
+
+
+
+
+
+
+
+Avec 10$ et OpenAI GPT-4o-mini, vous pouvez faire environ 10 000 sessions de jeu !
+
+Calcul détaillé :
+Prix OpenAI GPT-4o-mini :
+
+Input : $0.15 pour 1M tokens
+Output : $0.60 pour 1M tokens
+Pour une session de trivia typique :
+
+Prompt d'entrée : ~200 tokens
+Réponse JSON générée : ~800 tokens
+Coût par session : ~$0.001 (0.1 centime)
+Donc avec 10$ :
+
+10$ ÷ $0.001 = 10 000 sessions de jeu
+Comparaison avec d'autres alternatives :
+Service	Coût par session	Sessions avec 10$
+OpenAI GPT-4o-mini	$0.001	10 000
+Claude Haiku	$0.0008	12 500
+Groq	$0.0005	20 000
+Gemini Flash	Quotas limités	~1000-2000
+Bonus OpenAI :
+5$ gratuits par mois pour commencer
+Quotas très généreux (pas de limite stricte comme Gemini)
+Vitesse constante même en pic d'utilisation
+En pratique : Avec 10$, vous pourriez faire tourner votre jeu pendant des mois avec un usage intensif. C'est extrêmement économique pour votre cas d'usage !
+
+Voulez-vous que je vous aide à migrer vers OpenAI pour résoudre vos problèmes de quotas ?

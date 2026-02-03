@@ -4,6 +4,9 @@ import { useGame } from '../context/GameContext';
 import { GameStatus } from '../types';
 import ManagerView from '../components/ManagerView';
 import PlayerView from '../components/PlayerView';
+import { sessionService } from '../services/sessionService';
+import { questionService } from '../services/questionService';
+import { playerService } from '../services/playerService';
 
 const GamePage: React.FC = () => {
   const { sessionId } = useParams<{ sessionId: string }>();
@@ -11,14 +14,19 @@ const GamePage: React.FC = () => {
   const {
     session,
     status,
+    setStatus,
+    setSession,
     players,
+    setPlayers,
+    setQuestions,
     currentPlayerId,
     getRoomState,
     validateAnswer,
     skipQuestion,
     resetBuzzer,
     handleBuzz,
-    rejoinSession
+    rejoinSession,
+    fetchBuzzState
   } = useGame();
 
   // Flag pour éviter les appels multiples de rejoin
@@ -40,6 +48,31 @@ const GamePage: React.FC = () => {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId, hasTriedRejoin]); // Dépendances minimales
+
+  // Polling pour détecter la fin de la génération (GENERATING -> PLAYING)
+  useEffect(() => {
+    if (status !== GameStatus.GENERATING || !session?.id) return;
+
+    const pollInterval = setInterval(async () => {
+      const updatedSession = await sessionService.getSessionById(session.id);
+      if (updatedSession && updatedSession.status === 'PLAYING') {
+        clearInterval(pollInterval);
+
+        // Charger les données du jeu
+        const questionsData = await questionService.getQuestionsBySession(session.id);
+        const playersData = await playerService.getPlayersBySession(session.id);
+
+        setQuestions(questionsData);
+        setPlayers(playersData);
+        setSession({ ...session, ...updatedSession, status: GameStatus.PLAYING });
+        setStatus(GameStatus.PLAYING);
+        await fetchBuzzState(session.id);
+      }
+    }, 500); // Vérifie toutes les 500ms
+
+    return () => clearInterval(pollInterval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status, session?.id]);
 
   useEffect(() => {
     // Redirect to results if game is over
