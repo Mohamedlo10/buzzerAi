@@ -60,18 +60,20 @@ const ManagerView: React.FC<ManagerViewProps> = ({ state, onValidate, onSkip, on
       {/* Alerte STOP plein écran quand quelqu'un buzze */}
       {showStopAlert && playerOnTurn && (
         <div
-          className="fixed inset-0 z-50 bg-mSienna flex items-center justify-center cursor-pointer animate-pulse"
+          className="fixed inset-0 z-50 bg-gradient-to-br from-mSienna via-red-600 to-mOrange flex items-center justify-center cursor-pointer"
           onClick={() => setShowStopAlert(false)}
         >
-          <div className="text-center">
-            <div className="text-[120px] md:text-[200px] font-orbitron font-black text-white drop-shadow-2xl">
+          <div className="text-center animate-pulse">
+            <div className="text-[120px] md:text-[200px] font-orbitron font-black text-white drop-shadow-[0_0_30px_rgba(255,255,255,0.5)]">
               STOP
             </div>
-            <div className="text-2xl md:text-4xl font-bold text-white/90 mt-4">
-              <i className="fas fa-hand-paper mr-3"></i>
+            <div className="text-2xl md:text-4xl font-bold text-white mt-4">
+              <i className="fas fa-hand-paper mr-3 animate-bounce"></i>
               {playerOnTurn.name} a buzzé !
             </div>
-            <p className="text-white/60 mt-4 text-sm">Appuyez pour fermer</p>
+            <p className="text-white/70 mt-6 text-sm bg-black/20 px-4 py-2 rounded-full inline-block">
+              <i className="fas fa-touch mr-2"></i>Appuyez pour fermer
+            </p>
           </div>
         </div>
       )}
@@ -228,13 +230,19 @@ const ManagerView: React.FC<ManagerViewProps> = ({ state, onValidate, onSkip, on
         </div>
       </div>
 
-      <div className="glass p-4 md:p-6 rounded-3xl overflow-x-auto border-mGreen/10">
-         <h4 className="text-xs font-black uppercase tracking-[0.3em] text-mGreen mb-4">Mdev Live Scoreboard</h4>
-         <div className="flex space-x-4">
-            {state.players.map(p => (
-              <div key={p.id} className="flex flex-col items-center min-w-[130px] p-4 bg-mTeal/40 rounded-2xl border border-mGreen/10 shadow-lg">
-                <span className="text-[10px] text-mOrange font-bold mb-1 truncate w-full text-center uppercase">{p.name}</span>
-                <span className="text-2xl font-orbitron font-bold text-mYellow">{p.score}</span>
+      <div className="glass p-4 md:p-6 rounded-3xl overflow-x-auto border-mCyan/20">
+         <h4 className="text-xs font-black uppercase tracking-[0.3em] text-mCyan mb-4 flex items-center gap-2">
+           <i className="fas fa-trophy text-mYellow"></i>
+           Live Scoreboard
+         </h4>
+         <div className="flex space-x-3 md:space-x-4">
+            {[...state.players].sort((a, b) => b.score - a.score).map((p, i) => (
+              <div key={p.id} className={`flex flex-col items-center min-w-[100px] md:min-w-[130px] p-3 md:p-4 rounded-2xl border shadow-lg ${
+                i === 0 ? 'bg-mYellow/10 border-mYellow/40' : 'bg-mCard/60 border-mBorder/30'
+              }`}>
+                {i === 0 && <i className="fas fa-crown text-mYellow text-xs mb-1"></i>}
+                <span className="text-[10px] text-mCyan font-bold mb-1 truncate w-full text-center uppercase">{p.name}</span>
+                <span className="text-xl md:text-2xl font-orbitron font-bold text-mYellow">{p.score}</span>
               </div>
             ))}
          </div>

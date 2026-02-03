@@ -32,10 +32,10 @@ const PlayerView: React.FC<PlayerViewProps> = ({ state, playerId, onBuzz }) => {
             h-56 w-56 md:h-72 md:w-72 rounded-full flex flex-col items-center justify-center
             transition-all duration-300 transform active:scale-90 border-8
             ${isMyTurn
-              ? 'bg-mGreen border-mYellow text-mTeal shadow-[0_0_50px_rgba(42,157,143,0.6)] scale-105'
+              ? 'bg-mGreen border-mYellow text-white shadow-[0_0_60px_rgba(16,185,129,0.6)] scale-105'
               : hasBuzzed
-                ? 'bg-mOrange border-mTeal text-mTeal opacity-90 cursor-default'
-                : 'bg-mSienna border-mTeal text-white buzzer-active hover:shadow-[0_0_40px_rgba(231,111,81,0.5)]'
+                ? 'bg-mOrange border-mCard text-white opacity-90 cursor-default'
+                : 'bg-gradient-to-br from-mSienna to-red-700 border-mCard text-white buzzer-active hover:shadow-[0_0_50px_rgba(239,68,68,0.6)]'
             }
           `}
         >
@@ -133,8 +133,9 @@ const PlayerView: React.FC<PlayerViewProps> = ({ state, playerId, onBuzz }) => {
 
       {/* Classement en temps réel */}
       <div className="w-full max-w-md">
-        <div className="glass p-4 rounded-2xl border-mGreen/20">
-          <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-mGreen mb-3 text-center">
+        <div className="glass p-4 rounded-2xl border-mCyan/20">
+          <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-mCyan mb-3 text-center flex items-center justify-center gap-2">
+            <i className="fas fa-trophy"></i>
             Classement Live
           </h4>
           <div className="space-y-2">
@@ -142,19 +143,18 @@ const PlayerView: React.FC<PlayerViewProps> = ({ state, playerId, onBuzz }) => {
               .sort((a, b) => b.score - a.score)
               .map((p, i) => {
                 const isMe = p.id === playerId;
-                const medal = i === 0 ? 'text-yellow-400' : i === 1 ? 'text-gray-400' : i === 2 ? 'text-amber-600' : 'text-slate-500';
+                const medal = i === 0 ? 'text-mYellow' : i === 1 ? 'text-gray-300' : i === 2 ? 'text-amber-600' : 'text-slate-500';
+                const bgClass = i === 0 ? 'bg-mYellow/10 border-mYellow/30' : isMe ? 'bg-mCyan/10 border-mCyan/30' : 'bg-mCard/50 border-mBorder/30';
                 return (
                   <div
                     key={p.id}
-                    className={`flex items-center justify-between px-3 py-2 rounded-xl ${
-                      isMe ? 'bg-mOrange/20 border border-mOrange/50' : 'bg-mTeal/30'
-                    }`}
+                    className={`flex items-center justify-between px-3 py-2 rounded-xl border ${bgClass}`}
                   >
                     <div className="flex items-center gap-3">
                       <span className={`font-orbitron font-bold text-sm ${medal}`}>
-                        {i < 3 ? <i className={`fas fa-trophy`}></i> : `#${i + 1}`}
+                        {i < 3 ? <i className="fas fa-trophy"></i> : `#${i + 1}`}
                       </span>
-                      <span className={`font-bold text-sm ${isMe ? 'text-mOrange' : 'text-slate-300'}`}>
+                      <span className={`font-bold text-sm ${isMe ? 'text-mCyan' : 'text-slate-300'}`}>
                         {p.name} {isMe && '(vous)'}
                       </span>
                     </div>

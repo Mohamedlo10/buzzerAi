@@ -5,22 +5,28 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>BuzzMaster AI - par Mouha_Dev</title>
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='45' fill='%2311151D'/><circle cx='50' cy='50' r='35' fill='%23FFD754'/><text x='50' y='65' font-size='40' text-anchor='middle' fill='%2311151D' font-family='monospace' font-weight='bold'>⚡</text></svg>" />
-    <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='45' fill='%2311151D'/><circle cx='50' cy='50' r='35' fill='%23FFD754'/><text x='50' y='65' font-size='40' text-anchor='middle' fill='%2311151D' font-family='monospace' font-weight='bold'>⚡</text></svg>" />
-    <meta name="theme-color" content="#11151D">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><defs><linearGradient id='g' x1='0%25' y1='0%25' x2='100%25' y2='100%25'><stop offset='0%25' stop-color='%230f172a'/><stop offset='100%25' stop-color='%231e1b4b'/></linearGradient></defs><circle cx='50' cy='50' r='48' fill='url(%23g)'/><circle cx='50' cy='50' r='35' fill='%23fbbf24'/><text x='50' y='68' font-size='45' text-anchor='middle' fill='%230f172a' font-family='monospace' font-weight='bold'>⚡</text></svg>" />
+    <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><defs><linearGradient id='g' x1='0%25' y1='0%25' x2='100%25' y2='100%25'><stop offset='0%25' stop-color='%230f172a'/><stop offset='100%25' stop-color='%231e1b4b'/></linearGradient></defs><circle cx='50' cy='50' r='48' fill='url(%23g)'/><circle cx='50' cy='50' r='35' fill='%23fbbf24'/><text x='50' y='68' font-size='45' text-anchor='middle' fill='%230f172a' font-family='monospace' font-weight='bold'>⚡</text></svg>" />
+    <meta name="theme-color" content="#0f172a">
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
     <script>
       tailwind.config = {
         theme: {
           extend: {
             colors: {
-              mTeal: '#264653',
-              mGreen: '#2a9d8f',
-              mYellow: '#e9c46a',
-              mOrange: '#f4a261',
-              mSienna: '#e76f51',
+              // Nouvelle palette Quiz Master Pro
+              mTeal: '#0f172a',      // Fond principal (slate-900)
+              mGreen: '#10b981',     // Succès/Correct (emerald-500)
+              mYellow: '#fbbf24',    // Or/Scores (amber-400)
+              mOrange: '#f97316',    // Accents chauds (orange-500)
+              mSienna: '#ef4444',    // Buzz/Erreur (red-500)
+              // Nouvelles couleurs
+              mCyan: '#22d3ee',      // Éléments interactifs (cyan-400)
+              mPurple: '#a855f7',    // Accents secondaires (purple-500)
+              mCard: '#1e293b',      // Cartes (slate-800)
+              mBorder: '#334155',    // Bordures (slate-700)
             },
             fontFamily: {
               orbitron: ['Orbitron', 'sans-serif'],
@@ -33,21 +39,34 @@
     <style>
         body {
             font-family: 'Inter', sans-serif;
-            background-color: #264653; /* mTeal */
+            background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%);
+            background-attachment: fixed;
             color: #f8fafc;
+            min-height: 100vh;
         }
         .glass {
-            background: rgba(42, 157, 143, 0.1); /* mGreen low opacity */
+            background: rgba(30, 41, 59, 0.8);
             backdrop-filter: blur(16px);
-            border: 1px solid rgba(233, 196, 106, 0.2); /* mYellow border */
+            border: 1px solid rgba(51, 65, 85, 0.5);
         }
         .buzzer-active {
-            animation: pulse-sienna 1.5s infinite;
+            animation: pulse-buzz 1.5s infinite;
+            box-shadow: 0 0 30px rgba(239, 68, 68, 0.5);
         }
-        @keyframes pulse-sienna {
-            0% { box-shadow: 0 0 0 0 rgba(231, 111, 81, 0.7); }
-            70% { box-shadow: 0 0 0 25px rgba(231, 111, 81, 0); }
-            100% { box-shadow: 0 0 0 0 rgba(231, 111, 81, 0); }
+        @keyframes pulse-buzz {
+            0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+            70% { box-shadow: 0 0 0 30px rgba(239, 68, 68, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+        }
+        /* Effet glow pour les éléments importants */
+        .glow-gold {
+            box-shadow: 0 0 20px rgba(251, 191, 36, 0.3);
+        }
+        .glow-cyan {
+            box-shadow: 0 0 20px rgba(34, 211, 238, 0.3);
+        }
+        .glow-green {
+            box-shadow: 0 0 20px rgba(16, 185, 129, 0.3);
         }
     </style>
 <script type="importmap">

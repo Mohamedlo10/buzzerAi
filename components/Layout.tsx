@@ -24,11 +24,11 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     <div className="min-h-screen p-3 sm:p-4 md:p-8 max-w-6xl mx-auto flex flex-col">
       <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 sm:mb-12 gap-4">
         <Link to={user ? '/' : '/lobby'} className="group cursor-pointer">
-          <h1 className="text-2xl sm:text-3xl md:text-4xl font-orbitron font-black bg-gradient-to-r from-mYellow via-mOrange to-mSienna bg-clip-text text-transparent">
+          <h1 className="text-2xl sm:text-3xl md:text-4xl font-orbitron font-black bg-gradient-to-r from-mYellow via-mOrange to-mSienna bg-clip-text text-transparent drop-shadow-lg">
             BUZZMASTER PRO
           </h1>
-          <p className="text-mGreen text-[8px] sm:text-[10px] font-black tracking-[0.2em] sm:tracking-[0.4em] uppercase">
-            Live Platform <span className="text-mYellow">by Mouha_Dev</span>
+          <p className="text-[8px] sm:text-[10px] font-black tracking-[0.2em] sm:tracking-[0.4em] uppercase">
+            <span className="text-mCyan">Live Platform</span> <span className="text-mYellow">by Mouha_Dev</span>
           </p>
         </Link>
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3 w-full sm:w-auto">
