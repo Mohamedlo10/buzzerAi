@@ -138,24 +138,40 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
   const setupGame = async (allPlayers: Player[], debt: number, questionsPerCategory: number) => {
     if (!session) return;
 
-    await sessionService.startGenerating(session.id, debt, questionsPerCategory);
+    try {
+      await sessionService.startGenerating(session.id, debt, questionsPerCategory);
 
-    const allCategories: PlayerCategory[] = [];
-    allPlayers.forEach(p => {
-      p.categories.forEach(cat => {
-        if (!allCategories.find(c => c.name.toLowerCase() === cat.name.toLowerCase())) {
-          allCategories.push(cat);
-        }
+      const allCategories: PlayerCategory[] = [];
+      allPlayers.forEach(p => {
+        p.categories.forEach(cat => {
+          if (!allCategories.find(c => c.name.toLowerCase() === cat.name.toLowerCase())) {
+            allCategories.push(cat);
+          }
+        });
       });
-    });
 
-    if (allCategories.length === 0) {
-      allCategories.push({ name: "Culture Generale", difficulty: "Intermédiaire" } as PlayerCategory);
+      if (allCategories.length === 0) {
+        allCategories.push({ name: "Culture Generale", difficulty: "Intermédiaire" } as PlayerCategory);
+      }
+
+      const rawQuestions = await generateQuestions(allCategories, questionsPerCategory);
+
+      if (!rawQuestions || rawQuestions.length === 0) {
+        throw new Error('Aucune question générée');
+      }
+
+      await questionService.createQuestions(session.id, rawQuestions);
+      await sessionService.startPlaying(session.id);
+    } catch (error: any) {
+      console.error('Erreur lors du setup du jeu:', error);
+      // Remettre la session en état LOBBY en cas d'erreur
+      await sessionService.updateSessionStatus(session.id, GameStatus.LOBBY);
+      setStatus(GameStatus.LOBBY);
+
+      // Afficher l'erreur à l'utilisateur
+      const message = error?.message || 'Erreur lors de la génération des questions';
+      alert(`Erreur: ${message}\n\nVeuillez réessayer dans quelques secondes.`);
     }
-
-    const rawQuestions = await generateQuestions(allCategories, questionsPerCategory);
-    await questionService.createQuestions(session.id, rawQuestions);
-    await sessionService.startPlaying(session.id);
   };
 
   const handleBuzz = async (playerId: string) => {

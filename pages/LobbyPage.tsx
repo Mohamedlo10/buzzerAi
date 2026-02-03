@@ -48,6 +48,8 @@ const LobbyPage: React.FC = () => {
   const [difficultyInput, setDifficultyInput] = useState<PlayerCategory['difficulty']>('Intermédiaire');
 
   const [debt, setDebt] = useState(20);
+  const [isStartingGame, setIsStartingGame] = useState(false);
+  const [startingStep, setStartingStep] = useState('');
   const [qPerUser, setQPerUser] = useState(3);
   const [myLocalId, setMyLocalId] = useState(localStorage.getItem('mdev_player_id') || playerService.generateLocalId());
   const [isJoining, setIsJoining] = useState(false);
@@ -269,9 +271,24 @@ const LobbyPage: React.FC = () => {
 
   const handleStartGame = async () => {
     if (!localSession) return;
-    setSession(localSession);
-    setPlayers(localPlayers);
-    await setupGame(localPlayers, debt, qPerUser);
+
+    setIsStartingGame(true);
+    setStartingStep('Initialisation...');
+
+    try {
+      setSession(localSession);
+      setPlayers(localPlayers);
+
+      setStartingStep('Génération des questions avec l\'IA...');
+      await setupGame(localPlayers, debt, qPerUser);
+
+      setStartingStep('Lancement de la partie...');
+    } catch (error) {
+      console.error('Erreur:', error);
+    } finally {
+      setIsStartingGame(false);
+      setStartingStep('');
+    }
   };
 
   const addCategoryToTemp = () => {
@@ -415,6 +432,66 @@ const LobbyPage: React.FC = () => {
     );
   }
 
+  // Overlay de chargement lors du lancement
+  if (isStartingGame) {
+    return (
+      <div className="fixed inset-0 bg-mTeal/95 z-50 flex items-center justify-center">
+        <div className="text-center space-y-8 p-8 max-w-md">
+          {/* Animation du loader */}
+          <div className="relative mx-auto w-32 h-32">
+            {/* Cercle externe */}
+            <div className="absolute inset-0 border-4 border-mGreen/20 rounded-full"></div>
+            {/* Cercle animé */}
+            <div className="absolute inset-0 border-4 border-t-mYellow border-r-mOrange border-b-transparent border-l-transparent rounded-full animate-spin"></div>
+            {/* Icône centrale */}
+            <div className="absolute inset-0 flex items-center justify-center">
+              <i className="fas fa-brain text-4xl text-mYellow animate-pulse"></i>
+            </div>
+          </div>
+
+          {/* Titre */}
+          <div>
+            <h2 className="text-2xl font-orbitron font-black text-mYellow uppercase tracking-widest mb-2">
+              Préparation
+            </h2>
+            <p className="text-mGreen text-sm font-bold uppercase tracking-wider">
+              {startingStep}
+            </p>
+          </div>
+
+          {/* Barre de progression animée */}
+          <div className="w-full bg-mTeal/50 rounded-full h-2 overflow-hidden border border-mGreen/20">
+            <div className="h-full bg-gradient-to-r from-mGreen via-mYellow to-mOrange rounded-full animate-pulse"
+                 style={{ width: '100%', animation: 'loading-bar 2s ease-in-out infinite' }}>
+            </div>
+          </div>
+
+          {/* Message d'attente */}
+          <p className="text-slate-500 text-xs">
+            <i className="fas fa-info-circle mr-2"></i>
+            L'IA génère des questions personnalisées pour votre partie...
+          </p>
+
+          {/* Points animés */}
+          <div className="flex justify-center space-x-2">
+            <div className="w-2 h-2 bg-mYellow rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+            <div className="w-2 h-2 bg-mOrange rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+            <div className="w-2 h-2 bg-mGreen rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+          </div>
+        </div>
+
+        {/* Style pour l'animation de la barre */}
+        <style>{`
+          @keyframes loading-bar {
+            0% { transform: translateX(-100%); }
+            50% { transform: translateX(0%); }
+            100% { transform: translateX(100%); }
+          }
+        `}</style>
+      </div>
+    );
+  }
+
   // Vue de creation/join
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 animate-fade-in">
@@ -447,7 +524,7 @@ const LobbyPage: React.FC = () => {
               <div className="space-y-6">
                 <div className="bg-mTeal/60 p-6 rounded-2xl border border-mYellow/40 text-center">
                   <p className="text-mYellow font-black uppercase tracking-[0.4em] text-[10px] mb-3">CODE LIVE</p>
-                  <p className="text-5xl font-orbitron font-black text-white tracking-[0.3em]">{localSession.code}</p>
+                  <p className="text-3xl sm:text-5xl font-orbitron font-black text-white tracking-[0.3em]">{localSession.code}</p>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
@@ -459,9 +536,22 @@ const LobbyPage: React.FC = () => {
                     <input type="number" className="w-full bg-mTeal/40 p-4 rounded-xl border border-mGreen/20 text-white font-orbitron" value={qPerUser} onChange={e => setQPerUser(parseInt(e.target.value) || 1)} />
                   </div>
                 </div>
-                <button disabled={localPlayers.length < 2} onClick={handleStartGame} className="w-full bg-mGreen text-mTeal py-5 rounded-2xl font-orbitron font-black text-xl uppercase tracking-widest shadow-xl disabled:opacity-30 hover:bg-mGreen/90 transition-all">
-                  <i className="fas fa-play mr-2"></i>
-                  LANCER LE JEU
+                <button
+                  disabled={localPlayers.length < 2 || isStartingGame}
+                  onClick={handleStartGame}
+                  className="w-full bg-mGreen text-mTeal py-5 rounded-2xl font-orbitron font-black text-xl uppercase tracking-widest shadow-xl disabled:opacity-30 hover:bg-mGreen/90 transition-all"
+                >
+                  {isStartingGame ? (
+                    <>
+                      <i className="fas fa-spinner fa-spin mr-2"></i>
+                      PREPARATION...
+                    </>
+                  ) : (
+                    <>
+                      <i className="fas fa-play mr-2"></i>
+                      LANCER LE JEU
+                    </>
+                  )}
                 </button>
                 <p className="text-center text-xs text-slate-500">
                   {localPlayers.length < 2 ? 'Minimum 2 joueurs requis' : `${localPlayers.length} joueur(s) pret(s)`}

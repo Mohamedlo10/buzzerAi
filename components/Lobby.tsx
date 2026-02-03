@@ -383,7 +383,7 @@ const Lobby: React.FC<LobbyProps> = ({ onStart, onJoin, user, onBack, initialVie
               <div className="space-y-6">
                 <div className="bg-mTeal/60 p-6 rounded-2xl border border-mYellow/40 text-center">
                   <p className="text-mYellow font-black uppercase tracking-[0.4em] text-[10px] mb-3">CODE LIVE</p>
-                  <p className="text-5xl font-orbitron font-black text-white tracking-[0.3em]">{session.code}</p>
+                  <p className="text-3xl sm:text-5xl font-orbitron font-black text-white tracking-[0.3em]">{session.code}</p>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
